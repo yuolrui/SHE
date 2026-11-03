@@ -1,0 +1,11 @@
+{
+  "project": "c-lighttpd",
+  "phase": 2,
+  "architecture": "Event-driven Lighttpd plugin pipeline",
+  "plugins": [
+    "mod_status",
+    "mod_indexfile",
+    "mod_dirlisting",
+    "mod_accesslog"
+  ]
+}

@@ -33,31 +33,32 @@ int fdevent_poll(fdevent_system_t *ev, int timeout_ms);`,
   },
   {
     phase: 'Phase 2',
-    title: 'Lighttpd Modular Plugin System (Next Step)',
-    status: 'in-progress',
-    description: 'Transform monolithic handlers into Lighttpd’s modular plugin architecture. Each module registers hook function pointers into the request processing lifecycle.',
+    title: 'Lighttpd Modular Plugin System',
+    status: 'completed',
+    description: 'Decoupled plugin subsystem with plugin_t interface and lifecycle hooks: mod_status (/server-status), mod_indexfile cascade, mod_dirlisting HTML indexer, and mod_accesslog (CLF format).',
     features: [
       'plugin_t interface struct with standard Lighttpd hook callbacks',
-      'mod_indexfile: configurable index fallback order (index.html, index.htm, default.html)',
-      'mod_dirlisting: automatic HTML directory browsing with file size and mtime columns',
-      'mod_accesslog: Apache/Lighttpd Common Log Format (CLF) & Combined log streaming',
+      'mod_indexfile: configurable index fallback cascade (index.html, index.htm, default.html)',
+      'mod_dirlisting: automatic responsive HTML directory indexing with size and mtime columns',
+      'mod_accesslog: Apache/Lighttpd Combined Log Format (CLF) request logging to logs/access.log',
       'mod_status: internal /server-status metrics endpoint showing active connections and RPS',
     ],
-    codeHighlight: `/* Phase 2 Blueprint: Lighttpd Plugin Hook Architecture */
-typedef struct plugin {
+    codeHighlight: `/* Verified & Active in src/modules/ */
+typedef struct plugin plugin_t;
+struct plugin {
     size_t version;
     const char *name;
-    handler_t (*init)(server_t *srv);
-    handler_t (*handle_uri_clean)(server_t *srv, connection_t *con);
-    handler_t (*handle_subrequest_start)(server_t *srv, connection_t *con);
-    handler_t (*handle_response_done)(server_t *srv, connection_t *con);
-    handler_t (*cleanup)(server_t *srv);
-} plugin_t;`,
+    handler_t (*init)(server_t *srv, plugin_t *p);
+    handler_t (*cleanup)(server_t *srv, plugin_t *p);
+    handler_t (*handle_uri_clean)(server_t *srv, connection_t *con, void *p_data);
+    handler_t (*handle_subrequest_start)(server_t *srv, connection_t *con, void *p_data);
+    handler_t (*handle_response_done)(server_t *srv, connection_t *con, void *p_data);
+};`,
   },
   {
     phase: 'Phase 3',
     title: 'Dynamic Gateways & Configuration Lexer',
-    status: 'planned',
+    status: 'in-progress',
     description: 'Support dynamic web applications via FastCGI (PHP-FPM, Python, Node) and implement lighttpd.conf nested conditional configuration.',
     features: [
       'mod_fastcgi: binary FastCGI protocol client communicating over UNIX domain sockets or TCP',

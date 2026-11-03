@@ -50,6 +50,27 @@ const PRESETS = [
     desc: 'Tests client cache validation without retransmitting unchanged body.',
   },
   {
+    name: 'mod_status (/server-status)',
+    method: 'GET',
+    path: '/server-status',
+    headers: {},
+    desc: 'Lighttpd online metrics dashboard with uptime, active connections, and RPS.',
+  },
+  {
+    name: 'mod_status JSON (/server-status?json)',
+    method: 'GET',
+    path: '/server-status?json',
+    headers: {},
+    desc: 'Machine-readable JSON performance telemetry provided by mod_status.',
+  },
+  {
+    name: 'mod_dirlisting (/docs/)',
+    method: 'GET',
+    path: '/docs/',
+    headers: {},
+    desc: 'Automatic HTML directory indexing tree for folders without index.html.',
+  },
+  {
     name: 'HEAD Request (Headers Only)',
     method: 'HEAD',
     path: '/readme.txt',

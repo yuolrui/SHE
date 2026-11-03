@@ -3,8 +3,9 @@
 
 #include <time.h>
 #include <sys/types.h>
-#include "fdevent.h"
-#include "connection.h"
+#include "event/fdevent.h"
+#include "core/connection.h"
+#include "modules/plugin.h"
 
 typedef struct {
     char bind_ip[64];
@@ -43,6 +44,8 @@ struct server {
     
     connection_t **fd_to_con;
     int max_con_fds;
+    
+    plugin_array_t plugins;
     
     volatile int is_running;
 };

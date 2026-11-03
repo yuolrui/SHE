@@ -1,0 +1,182 @@
+#include "modules/mod_dirlisting.h"
+#include "core/server.h"
+#include "core/connection.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <time.h>
+
+static void get_http_date(time_t t, char *buf, size_t max) {
+    struct tm tm;
+    gmtime_r(&t, &tm);
+    strftime(buf, max, "%a, %d %b %Y %H:%M:%S GMT", &tm);
+}
+
+static void format_size(off_t size, char *buf, size_t max) {
+    if (size < 1024) {
+        snprintf(buf, max, "%lld B", (long long)size);
+    } else if (size < 1024 * 1024) {
+        snprintf(buf, max, "%.1f KB", (double)size / 1024.0);
+    } else {
+        snprintf(buf, max, "%.1f MB", (double)size / (1024.0 * 1024.0));
+    }
+}
+
+static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *con, void *p_data) {
+    (void)p_data;
+    const char *uri_path = buffer_cstr(con->request.uri_path);
+    char full_path[2048];
+    snprintf(full_path, sizeof(full_path), "%s%s", srv->config.document_root, uri_path);
+    
+    struct stat st;
+    if (stat(full_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        return HANDLER_GO_ON;
+    }
+    
+    DIR *dir = opendir(full_path);
+    if (!dir) {
+        return HANDLER_GO_ON;
+    }
+    
+    buffer_t *body = buffer_init_size(4096);
+    buffer_append_printf(body,
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head>\n"
+        "  <title>Index of %s</title>\n"
+        "  <style>\n"
+        "    body { font-family: system-ui, -apple-system, sans-serif; background: #0b0f19; color: #f1f5f9; padding: 40px; margin: 0; }\n"
+        "    .card { max-width: 860px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 28px; }\n"
+        "    h1 { font-size: 20px; color: #38bdf8; margin-top: 0; border-bottom: 1px solid #1f2937; padding-bottom: 12px; }\n"
+        "    table { width: 100%%; border-collapse: collapse; font-family: monospace; font-size: 13px; margin-top: 15px; }\n"
+        "    th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #1f2937; }\n"
+        "    th { color: #94a3b8; font-size: 11px; text-transform: uppercase; }\n"
+        "    tr:hover { background: #1e293b; }\n"
+        "    a { color: #38bdf8; text-decoration: none; }\n"
+        "    a:hover { text-decoration: underline; }\n"
+        "    .dir { color: #fbbf24; font-weight: bold; }\n"
+        "    .footer { margin-top: 20px; font-size: 11px; color: #64748b; }\n"
+        "  </style>\n"
+        "</head>\n"
+        "<body>\n"
+        "  <div class=\"card\">\n"
+        "    <h1>Index of %s</h1>\n"
+        "    <table>\n"
+        "      <thead>\n"
+        "        <tr><th>Name</th><th>Size</th><th>Last Modified</th></tr>\n"
+        "      </thead>\n"
+        "      <tbody>\n",
+        uri_path, uri_path
+    );
+    
+    /* Parent directory link if not root */
+    if (strcmp(uri_path, "/") != 0) {
+        buffer_append_string(body,
+            "        <tr><td><a href=\"../\" class=\"dir\">[Parent Directory] ../</a></td><td>-</td><td>-</td></tr>\n"
+        );
+    }
+    
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
+            continue;
+        }
+        
+        char item_path[4096];
+        snprintf(item_path, sizeof(item_path), "%s/%s", full_path, ent->d_name);
+        
+        struct stat item_st;
+        if (stat(item_path, &item_st) != 0) {
+            continue;
+        }
+        
+        int is_sub_dir = S_ISDIR(item_st.st_mode);
+        char size_buf[32];
+        if (is_sub_dir) {
+            strcpy(size_buf, "-");
+        } else {
+            format_size(item_st.st_size, size_buf, sizeof(size_buf));
+        }
+        
+        char date_buf[64];
+        struct tm tm;
+        localtime_r(&item_st.st_mtime, &tm);
+        strftime(date_buf, sizeof(date_buf), "%Y-%m-%d %H:%M", &tm);
+        
+        buffer_append_printf(body,
+            "        <tr>"
+            "<td><a href=\"%s%s%s\" class=\"%s\">%s%s</a></td>"
+            "<td>%s</td>"
+            "<td>%s</td>"
+            "</tr>\n",
+            uri_path,
+            (uri_path[strlen(uri_path) - 1] == '/') ? "" : "/",
+            ent->d_name,
+            is_sub_dir ? "dir" : "file",
+            ent->d_name,
+            is_sub_dir ? "/" : "",
+            size_buf,
+            date_buf
+        );
+    }
+    closedir(dir);
+    
+    buffer_append_printf(body,
+        "      </tbody>\n"
+        "    </table>\n"
+        "    <div class=\"footer\">c-lighttpd/1.0 mod_dirlisting · Directory Auto-Index</div>\n"
+        "  </div>\n"
+        "</body>\n"
+        "</html>\n"
+    );
+    
+    char cur_date[64];
+    get_http_date(time(NULL), cur_date, sizeof(cur_date));
+    
+    con->http_status = 200;
+    srv->stats.status_200++;
+    
+    buffer_reset(con->response_headers);
+    chunkqueue_reset(con->write_queue);
+    
+    buffer_append_printf(con->response_headers,
+        "HTTP/1.1 200 OK\r\n"
+        "Date: %s\r\n"
+        "Server: %s\r\n"
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: %s\r\n"
+        "\r\n",
+        cur_date,
+        srv->config.server_tag,
+        buffer_len(body),
+        con->keep_alive ? "keep-alive" : "close"
+    );
+    
+    chunkqueue_append_buffer(con->write_queue, con->response_headers);
+    if (con->request.method != HTTP_METHOD_HEAD) {
+        chunkqueue_append_buffer(con->write_queue, body);
+    }
+    
+    buffer_free(body);
+    con->state = CON_STATE_RESPONSE_START;
+    return HANDLER_FINISHED;
+}
+
+static plugin_t g_mod_dirlisting = {
+    .version = 1,
+    .name = "mod_dirlisting",
+    .description = "Automatic HTML directory indexing when no index file exists",
+    .init = NULL,
+    .cleanup = NULL,
+    .handle_uri_clean = NULL,
+    .handle_subrequest_start = mod_dirlisting_subrequest_start,
+    .handle_response_done = NULL,
+    .data = NULL,
+};
+
+plugin_t *mod_dirlisting_plugin_init(void) {
+    return &g_mod_dirlisting;
+}

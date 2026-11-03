@@ -369,6 +369,16 @@ app.get('/api/c-server/files', (_req, res) => {
     { folder: 'http', relPath: 'src/http/http_parser.c', name: 'http_parser.c' },
     { folder: 'http', relPath: 'src/http/mime_types.h', name: 'mime_types.h' },
     { folder: 'http', relPath: 'src/http/mime_types.c', name: 'mime_types.c' },
+    { folder: 'modules', relPath: 'src/modules/plugin.h', name: 'plugin.h' },
+    { folder: 'modules', relPath: 'src/modules/plugin.c', name: 'plugin.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_status.h', name: 'mod_status.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_status.c', name: 'mod_status.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_indexfile.h', name: 'mod_indexfile.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_indexfile.c', name: 'mod_indexfile.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_dirlisting.h', name: 'mod_dirlisting.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_dirlisting.c', name: 'mod_dirlisting.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_accesslog.h', name: 'mod_accesslog.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_accesslog.c', name: 'mod_accesslog.c' },
     { folder: 'main', relPath: 'src/main.c', name: 'main.c' },
     { folder: 'build', relPath: 'Makefile', name: 'Makefile' },
   ];
@@ -390,6 +400,64 @@ app.get('/api/c-server/files', (_req, res) => {
   });
 
   res.json({ files });
+});
+
+app.get('/api/c-server/logs/access', (_req, res) => {
+  const logPaths = [
+    path.join(C_SERVER_DIR, 'logs', 'access.log'),
+    path.join(C_SERVER_DIR, 'access.log'),
+  ];
+  let logContent = '';
+  for (const p of logPaths) {
+    if (fs.existsSync(p)) {
+      try {
+        logContent = fs.readFileSync(p, 'utf-8');
+        break;
+      } catch (e) {}
+    }
+  }
+
+  const lines = logContent
+    .split('\n')
+    .filter((l) => l.trim().length > 0)
+    .slice(-100);
+
+  res.json({ lines, count: lines.length });
+});
+
+app.get('/api/c-server/plugins', (_req, res) => {
+  res.json({
+    plugins: [
+      {
+        name: 'mod_status',
+        version: '1.0',
+        hooks: ['handle_subrequest_start'],
+        desc: 'Internal runtime performance metrics & online HTML/JSON status monitor (/server-status)',
+        active: true,
+      },
+      {
+        name: 'mod_indexfile',
+        version: '1.0',
+        hooks: ['handle_subrequest_start'],
+        desc: 'Configurable fallback cascade for index files (index.html, index.htm, default.html)',
+        active: true,
+      },
+      {
+        name: 'mod_dirlisting',
+        version: '1.0',
+        hooks: ['handle_subrequest_start'],
+        desc: 'Automatic interactive HTML directory indexing for directories without index files',
+        active: true,
+      },
+      {
+        name: 'mod_accesslog',
+        version: '1.0',
+        hooks: ['init', 'handle_response_done', 'cleanup'],
+        desc: 'Apache / Lighttpd standard Combined Log Format (CLF) request logging to logs/access.log',
+        active: true,
+      },
+    ],
+  });
 });
 
 app.get('/api/c-server/download', (_req, res) => {

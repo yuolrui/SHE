@@ -17,11 +17,12 @@ export const Header: React.FC<HeaderProps> = ({
   isCompiling,
 }) => {
   const navTabs = [
-    { id: 'overview', label: 'Overview & Architecture' },
+    { id: 'overview', label: 'Architecture' },
     { id: 'code', label: 'Code Explorer' },
-    { id: 'tester', label: 'Live Server & Tester' },
-    { id: 'benchmark', label: 'Benchmark Lab' },
-    { id: 'roadmap', label: 'Evolution Roadmap' },
+    { id: 'tester', label: 'Live Tester' },
+    { id: 'plugins', label: 'Modules & Logs' },
+    { id: 'benchmark', label: 'Benchmark' },
+    { id: 'roadmap', label: 'Roadmap' },
   ];
 
   const handleDownload = () => {

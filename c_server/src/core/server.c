@@ -1,5 +1,10 @@
-#include "server.h"
-#include "network.h"
+#include "core/server.h"
+#include "net/network.h"
+#include "modules/plugin.h"
+#include "modules/mod_status.h"
+#include "modules/mod_indexfile.h"
+#include "modules/mod_dirlisting.h"
+#include "modules/mod_accesslog.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -91,6 +96,13 @@ server_t *server_init(const server_config_t *cfg) {
     srv->stats.start_time = time(NULL);
     srv->is_running = 0;
     
+    /* Initialize and register Lighttpd plugin pipeline */
+    plugins_init(srv);
+    plugins_register(srv, mod_status_plugin_init());
+    plugins_register(srv, mod_indexfile_plugin_init());
+    plugins_register(srv, mod_dirlisting_plugin_init());
+    plugins_register(srv, mod_accesslog_plugin_init());
+    
     g_server = srv;
     return srv;
 }
@@ -99,6 +111,7 @@ void server_free(server_t *srv) {
     if (!srv) return;
     
     server_stop(srv);
+    plugins_cleanup(srv);
     
     if (srv->fd_to_con) {
         for (int i = 0; i < srv->max_con_fds; i++) {

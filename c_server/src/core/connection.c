@@ -1,7 +1,8 @@
-#include "connection.h"
-#include "server.h"
-#include "mime_types.h"
-#include "network.h"
+#include "core/connection.h"
+#include "core/server.h"
+#include "http/mime_types.h"
+#include "net/network.h"
+#include "modules/plugin.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -259,6 +260,22 @@ int connection_state_machine(server_t *srv, connection_t *con) {
             }
             
             case CON_STATE_HANDLE_REQUEST: {
+                /* Lighttpd Plugin Hook: URI Clean & Canonicalization */
+                if (plugins_call_handle_uri_clean(srv, con) == HANDLER_FINISHED) {
+                    break;
+                }
+                
+                /* Lighttpd Plugin Hook: Subrequest Start (mod_status, mod_indexfile, mod_dirlisting) */
+                handler_t hook_res = plugins_call_handle_subrequest_start(srv, con);
+                if (hook_res == HANDLER_FINISHED) {
+                    break; /* Request fully satisfied by plugin */
+                } else if (hook_res == HANDLER_ERROR) {
+                    generate_error_response(con, 500, srv->config.server_tag);
+                    update_stats_status(srv, 500);
+                    con->state = CON_STATE_RESPONSE_START;
+                    break;
+                }
+                
                 if (con->request.method != HTTP_METHOD_GET && 
                     con->request.method != HTTP_METHOD_HEAD) {
                     generate_error_response(con, 405, srv->config.server_tag);
@@ -473,6 +490,9 @@ int connection_state_machine(server_t *srv, connection_t *con) {
             }
             
             case CON_STATE_RESPONSE_END: {
+                /* Lighttpd Plugin Hook: Response Done (e.g. mod_accesslog) */
+                plugins_call_handle_response_done(srv, con);
+                
                 if (con->keep_alive) {
                     /* Reset and wait for next request on this connection */
                     con->state = CON_STATE_REQUEST_START;
@@ -484,6 +504,7 @@ int connection_state_machine(server_t *srv, connection_t *con) {
             
             case CON_STATE_ERROR:
             case CON_STATE_CLOSE: {
+                plugins_call_handle_response_done(srv, con);
                 server_close_connection(srv, con);
                 done = 1;
                 return 0;
