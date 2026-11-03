@@ -368,7 +368,7 @@ export const ArchitectureView: React.FC = () => {
           <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800 text-xs">
             <div className="flex items-center gap-2 text-slate-300 font-mono">
               <Code2 className="w-4 h-4 text-sky-400" />
-              <span>c_server/connection.c : connection_state_machine()</span>
+              <span>c_server/src/core/connection.c : connection_state_machine()</span>
             </div>
             <span className="text-[11px] text-slate-400 font-mono">C11 / Linux epoll</span>
           </div>

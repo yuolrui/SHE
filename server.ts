@@ -352,35 +352,37 @@ app.post('/api/c-server/benchmark', async (req, res) => {
 });
 
 app.get('/api/c-server/files', (_req, res) => {
-  const fileNames = [
-    'connection.h',
-    'connection.c',
-    'chunkqueue.h',
-    'chunkqueue.c',
-    'fdevent.h',
-    'fdevent.c',
-    'http_parser.h',
-    'http_parser.c',
-    'buffer.h',
-    'buffer.c',
-    'network.h',
-    'network.c',
-    'mime_types.h',
-    'mime_types.c',
-    'server.h',
-    'server.c',
-    'main.c',
-    'Makefile',
+  const fileEntries = [
+    { folder: 'core', relPath: 'src/core/server.h', name: 'server.h' },
+    { folder: 'core', relPath: 'src/core/server.c', name: 'server.c' },
+    { folder: 'core', relPath: 'src/core/connection.h', name: 'connection.h' },
+    { folder: 'core', relPath: 'src/core/connection.c', name: 'connection.c' },
+    { folder: 'core', relPath: 'src/core/chunkqueue.h', name: 'chunkqueue.h' },
+    { folder: 'core', relPath: 'src/core/chunkqueue.c', name: 'chunkqueue.c' },
+    { folder: 'core', relPath: 'src/core/buffer.h', name: 'buffer.h' },
+    { folder: 'core', relPath: 'src/core/buffer.c', name: 'buffer.c' },
+    { folder: 'event', relPath: 'src/event/fdevent.h', name: 'fdevent.h' },
+    { folder: 'event', relPath: 'src/event/fdevent.c', name: 'fdevent.c' },
+    { folder: 'net', relPath: 'src/net/network.h', name: 'network.h' },
+    { folder: 'net', relPath: 'src/net/network.c', name: 'network.c' },
+    { folder: 'http', relPath: 'src/http/http_parser.h', name: 'http_parser.h' },
+    { folder: 'http', relPath: 'src/http/http_parser.c', name: 'http_parser.c' },
+    { folder: 'http', relPath: 'src/http/mime_types.h', name: 'mime_types.h' },
+    { folder: 'http', relPath: 'src/http/mime_types.c', name: 'mime_types.c' },
+    { folder: 'main', relPath: 'src/main.c', name: 'main.c' },
+    { folder: 'build', relPath: 'Makefile', name: 'Makefile' },
   ];
 
-  const files = fileNames.map((name) => {
-    const filePath = path.join(C_SERVER_DIR, name);
+  const files = fileEntries.map(({ folder, relPath, name }) => {
+    const filePath = path.join(C_SERVER_DIR, relPath);
     if (!fs.existsSync(filePath)) {
-      return { name, content: '', lines: 0, size: 0 };
+      return { path: relPath, name, folder, content: '', lines: 0, size: 0 };
     }
     const content = fs.readFileSync(filePath, 'utf-8');
     return {
+      path: relPath,
       name,
+      folder,
       content,
       lines: content.split('\n').length,
       size: Buffer.byteLength(content, 'utf-8'),

@@ -284,10 +284,16 @@ int connection_state_machine(server_t *srv, connection_t *con) {
                 if (S_ISDIR(st.st_mode)) {
                     char index_path[2048];
                     size_t path_len = strlen(full_path);
-                    if (path_len > 0 && full_path[path_len - 1] == '/') {
-                        snprintf(index_path, sizeof(index_path), "%sindex.html", full_path);
+                    if (path_len + 16 >= sizeof(index_path)) {
+                        generate_error_response(con, 414, srv->config.server_tag);
+                        con->state = CON_STATE_RESPONSE_START;
+                        break;
+                    }
+                    memcpy(index_path, full_path, path_len);
+                    if (path_len > 0 && index_path[path_len - 1] == '/') {
+                        memcpy(index_path + path_len, "index.html", 11);
                     } else {
-                        snprintf(index_path, sizeof(index_path), "%s/index.html", full_path);
+                        memcpy(index_path + path_len, "/index.html", 12);
                     }
                     
                     if (stat(index_path, &st) == 0 && S_ISREG(st.st_mode)) {
