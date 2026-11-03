@@ -1,0 +1,8 @@
+{
+  "name": "c-lighttpd Web Server Studio",
+  "description": "High-performance Lighttpd-style C Web Server workbench with non-blocking epoll, 10-state FSM, zero-copy sendfile, interactive compiler, and HTTP test suite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

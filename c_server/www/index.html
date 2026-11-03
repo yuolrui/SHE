@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>c-lighttpd - High Performance Lighttpd-style C Web Server</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <span class="badge">Lighttpd Architecture in Pure C</span>
+      <h1>c-lighttpd is Running!</h1>
+      <p class="subtitle">Single-process, non-blocking I/O with Linux epoll, Connection State Machine & Zero-Copy sendfile.</p>
+      
+      <div class="grid">
+        <div class="metric">
+          <div class="metric-val">epoll(7)</div>
+          <div class="metric-lbl">Event Multiplexing</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">10 States</div>
+          <div class="metric-lbl">Connection FSM</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">sendfile(2)</div>
+          <div class="metric-lbl">Zero-Copy Chunks</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">HTTP/1.1</div>
+          <div class="metric-lbl">Keep-Alive & Range</div>
+        </div>
+      </div>
+
+      <div class="links">
+        <a href="/data.json" class="btn">View JSON API</a>
+        <a href="/readme.txt" class="btn">View Plaintext</a>
+      </div>
+    </div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

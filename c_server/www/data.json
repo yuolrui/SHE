@@ -1,0 +1,16 @@
+{
+  "server": "c-lighttpd",
+  "version": "1.0.0",
+  "architecture": "Lighttpd event-driven state machine",
+  "features": [
+    "Non-blocking epoll event loop",
+    "Lighttpd 10-state connection FSM",
+    "Zero-copy sendfile(2) chunkqueue",
+    "HTTP/1.1 persistent keep-alive",
+    "HTTP 206 Partial Content range requests",
+    "Path traversal sanitization",
+    "Dynamic mime-types detection"
+  ],
+  "author": "Google AI Studio Developer",
+  "status": "operational"
+}
