@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Clock, ArrowRight, Code2, Layers, Cpu, Shield, Zap } from 'lucide-react';
+import { CheckCircle2, Clock, ArrowRight, Code2, Layers, Cpu, ShieldCheck, Zap, Lock, Globe } from 'lucide-react';
 
 interface Milestone {
   phase: string;
@@ -13,13 +13,13 @@ interface Milestone {
 const MILESTONES: Milestone[] = [
   {
     phase: 'Phase 1',
-    title: 'Core Engine & Non-Blocking State Machine (Current Milestone)',
+    title: 'Core Engine & Non-Blocking State Machine',
     status: 'completed',
-    description: 'Foundation inspired directly by Lighttpd 1.4: Single-process event-driven architecture, Linux epoll multiplexing, 10-state connection FSM, and zero-copy sendfile(2).',
+    description: 'Foundation inspired by Lighttpd 1.4: Single-process event-driven architecture, Linux epoll multiplexing, 10-state connection FSM, and zero-copy sendfile(2).',
     features: [
-      'Linux epoll(7) multiplexing via fdevent abstraction layer',
-      '10-state Connection State Machine (CON_STATE_CONNECT to CON_STATE_CLOSE)',
-      'Zero-copy file transmission via Linux sendfile(2) in chunkqueue',
+      'Linux epoll(7) multiplexing via she_fdevent abstraction layer',
+      '10-state Connection Finite State Machine (SHE_CON_STATE_CONNECT to CLOSE)',
+      'Zero-copy file transmission via Linux sendfile(2) in she_chunkqueue',
       'HTTP/1.1 Request Line & Header parser with Range header support',
       'Path traversal security guard (normalizing /../ and %2e%2e)',
       'HTTP 206 Partial Content byte-range slicing',
@@ -27,63 +27,61 @@ const MILESTONES: Milestone[] = [
       'Static MIME-type mapping table with extension detection',
     ],
     codeHighlight: `/* Verified & Active in c_server/ */
-int connection_state_machine(server_t *srv, connection_t *con);
-ssize_t chunkqueue_write_chunk_to_socket(chunkqueue_t *cq, int socket_fd);
-int fdevent_poll(fdevent_system_t *ev, int timeout_ms);`,
+int she_connection_state_machine(she_server_t *srv, she_connection_t *con);
+ssize_t she_chunkqueue_write_chunk_to_socket(she_chunkqueue_t *cq, int socket_fd);
+int she_fdevent_poll(she_fdevent_system_t *ev, int timeout_ms);`,
   },
   {
     phase: 'Phase 2',
-    title: 'Lighttpd Modular Plugin System',
+    title: 'Lighttpd Modular Plugin Subsystem',
     status: 'completed',
-    description: 'Decoupled plugin subsystem with plugin_t interface and lifecycle hooks: mod_status (/server-status), mod_indexfile cascade, mod_dirlisting HTML indexer, and mod_accesslog (CLF format).',
+    description: 'Decoupled plugin subsystem with she_plugin_t interface and lifecycle hooks: mod_status (/server-status), mod_indexfile cascade, mod_dirlisting HTML indexer, and mod_accesslog (CLF format).',
     features: [
-      'plugin_t interface struct with standard Lighttpd hook callbacks',
+      'she_plugin_t interface struct with standard hook callbacks',
       'mod_indexfile: configurable index fallback cascade (index.html, index.htm, default.html)',
       'mod_dirlisting: automatic responsive HTML directory indexing with size and mtime columns',
       'mod_accesslog: Apache/Lighttpd Combined Log Format (CLF) request logging to logs/access.log',
       'mod_status: internal /server-status metrics endpoint showing active connections and RPS',
     ],
     codeHighlight: `/* Verified & Active in src/modules/ */
-typedef struct plugin plugin_t;
-struct plugin {
+typedef struct she_plugin she_plugin_t;
+struct she_plugin {
     size_t version;
     const char *name;
-    handler_t (*init)(server_t *srv, plugin_t *p);
-    handler_t (*cleanup)(server_t *srv, plugin_t *p);
-    handler_t (*handle_uri_clean)(server_t *srv, connection_t *con, void *p_data);
-    handler_t (*handle_subrequest_start)(server_t *srv, connection_t *con, void *p_data);
-    handler_t (*handle_response_done)(server_t *srv, connection_t *con, void *p_data);
+    she_handler_t (*init)(she_server_t *srv, she_plugin_t *p);
+    she_handler_t (*cleanup)(she_server_t *srv, she_plugin_t *p);
+    she_handler_t (*handle_uri_clean)(she_server_t *srv, she_connection_t *con, void *p_data);
+    she_handler_t (*handle_subrequest_start)(she_server_t *srv, she_connection_t *con, void *p_data);
+    she_handler_t (*handle_response_done)(she_server_t *srv, she_connection_t *con, void *p_data);
 };`,
   },
   {
     phase: 'Phase 3',
-    title: 'Dynamic Gateways & Configuration Lexer',
-    status: 'in-progress',
-    description: 'Support dynamic web applications via FastCGI (PHP-FPM, Python, Node) and implement lighttpd.conf nested conditional configuration.',
+    title: 'SHE Security Hardening, Basic Auth, VHost & FastCGI',
+    status: 'completed',
+    description: 'Rebranded project to SHE (Secure HTTP Engine) with she_ keyword prefix across all subsystems. Implemented token-bucket rate limiter, RFC 7617 Basic Authentication, virtual hosts, and FastCGI protocol framing.',
     features: [
-      'mod_fastcgi: binary FastCGI protocol client communicating over UNIX domain sockets or TCP',
-      'Non-blocking upstream proxying using fdevent event loop',
-      'lighttpd.conf parser supporting nested conditionals ($HTTP["host"] == "...")',
-      'mod_simple_vhost: multi-tenant Virtual Hosting with per-host document roots',
-      'mod_auth: HTTP Basic Authentication with htpasswd file parsing',
+      'she_ keyword prefix across types (she_server_t, she_connection_t, she_buffer_t)',
+      'she_security: token-bucket per-IP rate limiter returning 429 Too Many Requests',
+      'Injected defense headers: nosniff, SAMEORIGIN, XSS-Protection, Referrer-Policy',
+      'mod_auth: RFC 7617 HTTP Basic Authentication with base64 decoding for /secure/',
+      'mod_vhost: Virtual Host routing matching Host headers (docs.local, api.local)',
+      'mod_fastcgi: FastCGI 1.0 binary upstream client framing (FCGI_BEGIN_REQUEST, FCGI_PARAMS)',
+      'Runtime configuration file parser: she.conf support via -c argument',
     ],
-    codeHighlight: `/* Phase 3 Blueprint: FastCGI Record Header */
-typedef struct {
-    unsigned char version;
-    unsigned char type;          /* FCGI_BEGIN_REQUEST, FCGI_PARAMS, FCGI_STDIN */
-    unsigned char requestIdB1;
-    unsigned char requestIdB0;
-    unsigned char contentLengthB1;
-    unsigned char contentLengthB0;
-    unsigned char paddingLength;
-    unsigned char reserved;
-} fcgi_header_t;`,
+    codeHighlight: `/* Verified & Active in c_server/ */
+int she_security_check_rate_limit(she_security_t *sec, const char *client_ip);
+int she_security_append_headers(she_security_t *sec, she_connection_t *con);
+she_plugin_t *mod_auth_plugin_init(void);
+she_plugin_t *mod_vhost_plugin_init(void);
+she_plugin_t *mod_fastcgi_plugin_init(void);
+int she_config_load_file(she_server_config_t *cfg, const char *filepath);`,
   },
   {
     phase: 'Phase 4',
-    title: 'Production Hardening, TLS & Protocol Evolution',
+    title: 'TLS 1.3 Termination, Compression & HTTP/2',
     status: 'planned',
-    description: 'Enterprise deployment capabilities including TLS termination, on-the-fly streaming compression, and HTTP/2 framing.',
+    description: 'Enterprise deployment capabilities including TLS termination, on-the-fly streaming compression, and HTTP/2 multiplexing.',
     features: [
       'mod_openssl: TLS 1.3 / 1.2 termination using OpenSSL or mbedTLS with ALPN',
       'mod_compress: dynamic on-the-fly chunked Gzip & Brotli HTTP transfer encoding',
@@ -93,34 +91,34 @@ typedef struct {
     ],
     codeHighlight: `/* Phase 4 Blueprint: TLS Socket Abstraction */
 typedef struct {
-    int (*read)(connection_t *con, void *buf, size_t count);
-    int (*write)(connection_t *con, const void *buf, size_t count);
-    SSL *ssl_handle;
-} network_backend_t;`,
+    int (*read)(she_connection_t *con, void *buf, size_t count);
+    int (*write)(she_connection_t *con, const void *buf, size_t count);
+    void *ssl_handle;
+} she_network_backend_t;`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[0]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[2]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Overview header */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
         <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mb-2">
-          <span>Iterative Engineering Roadmap</span>
+          <span className="text-emerald-400 font-bold">SHE Evolutionary Roadmap</span>
           <span aria-hidden="true">·</span>
-          <span>Lighttpd Architecture Equivalence</span>
+          <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Step-by-Step Milestones</span>
+          <span>Phase 1, 2, and 3 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
-          Server Evolution: From Foundation to Lighttpd Parity
+          SHE (Secure HTTP Engine) Milestone Roadmap
         </h2>
         <p className="text-xs text-slate-300 leading-relaxed max-w-3xl mt-1">
-          As requested (&quot;可以一步一步完善。先实现基础功能。&quot;), the project begins with Phase 1: the core
-          high-performance non-blocking event engine, 10-state machine, and zero-copy chunkqueue. Below is the
-          step-by-step roadmap to achieve complete equivalence with lighttpd.
+          Evolution from a bare single-process epoll loop into a fully-featured, secure HTTP engine with standard{' '}
+          <code className="text-emerald-300 font-mono">she_</code> prefix keywords, token-bucket rate limiting,
+          RFC 7617 Basic Authentication, virtual hosting, and FastCGI protocol framing.
         </p>
       </div>
 
@@ -128,90 +126,97 @@ export const RoadmapView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {MILESTONES.map((m) => {
           const isSelected = selectedMilestone.phase === m.phase;
+          const isCompleted = m.status === 'completed';
+
           return (
             <button
               key={m.phase}
               onClick={() => setSelectedMilestone(m)}
               className={`flex flex-col text-left p-5 rounded-xl border transition-all ${
                 isSelected
-                  ? 'bg-slate-800 border-sky-500 shadow-md ring-1 ring-sky-500/30'
+                  ? 'bg-slate-800 border-emerald-500 shadow-md ring-1 ring-emerald-500/30'
                   : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
               }`}
             >
-              <div className="flex items-center justify-between w-full mb-3">
-                <span className="text-xs font-mono font-bold text-sky-400">{m.phase}</span>
-                {m.status === 'completed' ? (
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Verified
-                  </span>
-                ) : m.status === 'in-progress' ? (
-                  <span className="flex items-center gap-1 text-[11px] text-amber-400 font-mono">
-                    <Clock className="w-3.5 h-3.5" />
-                    In Progress
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-slate-500 font-mono">Planned</span>
-                )}
+              <div className="flex items-center justify-between w-full mb-2">
+                <span className="text-xs font-mono font-bold text-emerald-400">{m.phase}</span>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
+                    isCompleted
+                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/80'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {isCompleted ? 'Completed' : 'Planned'}
+                </span>
               </div>
-              <h3 className="text-sm font-bold text-white tracking-tight line-clamp-2">{m.title}</h3>
-              <p className="text-[11px] text-slate-400 mt-2 line-clamp-3 leading-relaxed">
-                {m.description}
-              </p>
+              <h3 className="text-sm font-bold text-white mb-1.5">{m.title}</h3>
+              <p className="text-xs text-slate-400 line-clamp-2">{m.description}</p>
             </button>
           );
         })}
       </div>
 
       {/* Selected Milestone Deep-Dive */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left: Features checklist (6 cols) */}
-        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-6 space-y-5">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
-            <span className="text-xs font-mono text-sky-400">{selectedMilestone.phase} Specifications</span>
-            <h3 className="text-lg font-bold text-white tracking-tight mt-0.5">{selectedMilestone.title}</h3>
-            <p className="text-xs text-slate-300 mt-2 leading-relaxed">{selectedMilestone.description}</p>
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 mb-1">
+              <span>{selectedMilestone.phase}</span>
+              <span aria-hidden="true">·</span>
+              <span className="uppercase">{selectedMilestone.status}</span>
+            </div>
+            <h3 className="text-xl font-bold text-white">{selectedMilestone.title}</h3>
           </div>
 
-          <div className="space-y-3 pt-3 border-t border-slate-800">
-            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Features & Capabilities</h4>
-            <div className="space-y-2">
-              {selectedMilestone.features.map((feat, i) => (
-                <div key={i} className="flex items-start gap-2.5 text-xs text-slate-300">
-                  <CheckCircle2
-                    className={`w-4 h-4 shrink-0 mt-0.5 ${
-                      selectedMilestone.status === 'completed' ? 'text-emerald-400' : 'text-slate-500'
-                    }`}
-                  />
-                  <span>{feat}</span>
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs font-mono px-3 py-1 rounded font-bold ${
+                selectedMilestone.status === 'completed'
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                  : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              {selectedMilestone.status === 'completed' ? 'Verified in Codebase' : 'Next Roadmap Step'}
+            </span>
           </div>
         </div>
 
-        {/* Right: Code Blueprint & Architecture (6 cols) */}
-        <div className="lg:col-span-6 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-              <Code2 className="w-4 h-4 text-sky-400" />
-              <span>Architectural Blueprint / Code Interface</span>
-            </div>
-            <span className="text-[11px] font-mono text-slate-400">{selectedMilestone.phase}</span>
-          </div>
+        <p className="text-xs text-slate-300 leading-relaxed max-w-4xl">
+          {selectedMilestone.description}
+        </p>
 
-          <div className="p-4 font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto bg-slate-950">
+        {/* Feature checklist */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
+            Subsystems & Capabilities Included
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {selectedMilestone.features.map((feat, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2.5 p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{feat}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* C Code Highlight */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-emerald-400" />
+              <span>Architectural C Definition</span>
+            </h4>
+            <span className="text-[11px] font-mono text-slate-400">Pure C11</span>
+          </div>
+          <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 overflow-x-auto">
             <pre>
               <code>{selectedMilestone.codeHighlight}</code>
             </pre>
-          </div>
-
-          <div className="px-4 py-3 bg-slate-900/40 border-t border-slate-800 text-[11px] text-slate-400">
-            <span>
-              {selectedMilestone.status === 'completed'
-                ? 'Phase 1 is fully compiled with GCC and running live in the environment.'
-                : 'Interface designed for smooth drop-in expansion without breaking existing socket handlers.'}
-            </span>
           </div>
         </div>
       </div>

@@ -14,8 +14,15 @@ app.use(express.json());
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const C_SERVER_PORT = 8899;
 const C_SERVER_DIR = path.resolve(__dirname, 'c_server');
-const C_SERVER_BIN = path.resolve(C_SERVER_DIR, 'c_lighttpd');
+const SHE_BIN = path.resolve(C_SERVER_DIR, 'she');
+const LEGACY_BIN = path.resolve(C_SERVER_DIR, 'c_lighttpd');
 const C_SERVER_WWW = path.resolve(C_SERVER_DIR, 'www');
+
+function getCServerBin(): string {
+  if (fs.existsSync(SHE_BIN)) return SHE_BIN;
+  if (fs.existsSync(LEGACY_BIN)) return LEGACY_BIN;
+  return SHE_BIN;
+}
 
 let cServerProcess: ChildProcess | null = null;
 let cServerStartTime: number | null = null;
@@ -31,15 +38,16 @@ function appendLog(line: string) {
 
 function ensureCompiled(): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
-    exec('which gcc || (apt-get update && apt-get install -y gcc make)', (installErr) => {
+    exec('which gcc || (apt-get update && apt-get install -y gcc make)', () => {
       exec('make -C ' + C_SERVER_DIR, (err, stdout, stderr) => {
         const output = (stdout || '') + '\n' + (stderr || '');
-        if (fs.existsSync(C_SERVER_BIN)) {
+        const bin = getCServerBin();
+        if (fs.existsSync(bin)) {
           try {
-            fs.chmodSync(C_SERVER_BIN, 0o755);
+            fs.chmodSync(bin, 0o755);
           } catch (e) {}
         }
-        resolve({ success: !err && fs.existsSync(C_SERVER_BIN), output });
+        resolve({ success: !err && fs.existsSync(bin), output });
       });
     });
   });
@@ -51,13 +59,14 @@ function startCServerProcess(port = C_SERVER_PORT): Promise<boolean> {
       return resolve(true);
     }
 
-    if (fs.existsSync(C_SERVER_BIN)) {
+    const bin = getCServerBin();
+    if (fs.existsSync(bin)) {
       try {
-        fs.chmodSync(C_SERVER_BIN, 0o755);
+        fs.chmodSync(bin, 0o755);
       } catch (e) {}
       launchProcess(port, resolve);
     } else {
-      appendLog('Binary not found, compiling before starting...');
+      appendLog('Binary not found, compiling SHE engine before starting...');
       ensureCompiled().then(({ success, output }) => {
         appendLog(output.trim());
         if (!success) return resolve(false);
@@ -69,17 +78,24 @@ function startCServerProcess(port = C_SERVER_PORT): Promise<boolean> {
 
 function launchProcess(port: number, resolve: (val: boolean) => void) {
   try {
-    if (fs.existsSync(C_SERVER_BIN)) {
+    const bin = getCServerBin();
+    if (fs.existsSync(bin)) {
       try {
-        fs.chmodSync(C_SERVER_BIN, 0o755);
+        fs.chmodSync(bin, 0o755);
       } catch (e) {}
     }
-    cServerProcess = spawn(C_SERVER_BIN, ['-p', port.toString(), '-d', C_SERVER_WWW, '-v'], {
+    const confFile = path.resolve(C_SERVER_DIR, 'she.conf');
+    const args = ['-p', port.toString(), '-d', C_SERVER_WWW, '-v'];
+    if (fs.existsSync(confFile)) {
+      args.unshift('-c', confFile);
+    }
+
+    cServerProcess = spawn(bin, args, {
       cwd: C_SERVER_DIR,
     });
 
     cServerStartTime = Date.now();
-    appendLog(`Spawned c_lighttpd PID ${cServerProcess.pid} on port ${port}`);
+    appendLog(`Spawned SHE (Secure HTTP Engine) PID ${cServerProcess.pid} on port ${port}`);
 
     cServerProcess.stdout?.on('data', (data) => {
       const str = data.toString();
@@ -141,12 +157,14 @@ function stopCServerProcess(): Promise<boolean> {
 
 app.get('/api/c-server/status', (_req, res) => {
   const isRunning = Boolean(cServerProcess && !cServerProcess.killed);
-  const binaryExists = fs.existsSync(C_SERVER_BIN);
+  const bin = getCServerBin();
+  const binaryExists = fs.existsSync(bin);
   const uptime = isRunning && cServerStartTime ? Math.floor((Date.now() - cServerStartTime) / 1000) : 0;
 
   res.json({
     isRunning,
     binaryExists,
+    engine: 'SHE (Secure HTTP Engine)',
     pid: isRunning ? cServerProcess?.pid : null,
     port: C_SERVER_PORT,
     uptime,
@@ -171,18 +189,25 @@ app.post('/api/c-server/stop', async (_req, res) => {
 
 app.post('/api/c-server/compile', (_req, res) => {
   const startTime = Date.now();
-  appendLog('Executing: make clean && make');
+  appendLog('Executing: make -C c_server clean && make -C c_server');
 
-  exec('make clean && make', { cwd: C_SERVER_DIR }, (err, stdout, stderr) => {
+  exec('make -C ' + C_SERVER_DIR + ' clean && make -C ' + C_SERVER_DIR, (err, stdout, stderr) => {
     const elapsed = Date.now() - startTime;
     const output = (stdout || '') + '\n' + (stderr || '');
-    const success = !err;
+    const bin = getCServerBin();
+    const success = !err && fs.existsSync(bin);
+
+    if (success && fs.existsSync(bin)) {
+      try {
+        fs.chmodSync(bin, 0o755);
+      } catch (e) {}
+    }
 
     appendLog(`Compile ${success ? 'SUCCEEDED' : 'FAILED'} in ${elapsed}ms`);
 
     let binarySize = 0;
-    if (fs.existsSync(C_SERVER_BIN)) {
-      binarySize = fs.statSync(C_SERVER_BIN).size;
+    if (fs.existsSync(bin)) {
+      binarySize = fs.statSync(bin).size;
     }
 
     res.json({
@@ -353,24 +378,34 @@ app.post('/api/c-server/benchmark', async (req, res) => {
 
 app.get('/api/c-server/files', (_req, res) => {
   const fileEntries = [
-    { folder: 'core', relPath: 'src/core/server.h', name: 'server.h' },
-    { folder: 'core', relPath: 'src/core/server.c', name: 'server.c' },
-    { folder: 'core', relPath: 'src/core/connection.h', name: 'connection.h' },
-    { folder: 'core', relPath: 'src/core/connection.c', name: 'connection.c' },
-    { folder: 'core', relPath: 'src/core/chunkqueue.h', name: 'chunkqueue.h' },
-    { folder: 'core', relPath: 'src/core/chunkqueue.c', name: 'chunkqueue.c' },
-    { folder: 'core', relPath: 'src/core/buffer.h', name: 'buffer.h' },
-    { folder: 'core', relPath: 'src/core/buffer.c', name: 'buffer.c' },
-    { folder: 'event', relPath: 'src/event/fdevent.h', name: 'fdevent.h' },
-    { folder: 'event', relPath: 'src/event/fdevent.c', name: 'fdevent.c' },
-    { folder: 'net', relPath: 'src/net/network.h', name: 'network.h' },
-    { folder: 'net', relPath: 'src/net/network.c', name: 'network.c' },
-    { folder: 'http', relPath: 'src/http/http_parser.h', name: 'http_parser.h' },
-    { folder: 'http', relPath: 'src/http/http_parser.c', name: 'http_parser.c' },
-    { folder: 'http', relPath: 'src/http/mime_types.h', name: 'mime_types.h' },
-    { folder: 'http', relPath: 'src/http/mime_types.c', name: 'mime_types.c' },
-    { folder: 'modules', relPath: 'src/modules/plugin.h', name: 'plugin.h' },
-    { folder: 'modules', relPath: 'src/modules/plugin.c', name: 'plugin.c' },
+    { folder: 'core', relPath: 'src/core/she_server.h', name: 'she_server.h' },
+    { folder: 'core', relPath: 'src/core/she_server.c', name: 'she_server.c' },
+    { folder: 'core', relPath: 'src/core/she_connection.h', name: 'she_connection.h' },
+    { folder: 'core', relPath: 'src/core/she_connection.c', name: 'she_connection.c' },
+    { folder: 'core', relPath: 'src/core/she_chunkqueue.h', name: 'she_chunkqueue.h' },
+    { folder: 'core', relPath: 'src/core/she_chunkqueue.c', name: 'she_chunkqueue.c' },
+    { folder: 'core', relPath: 'src/core/she_buffer.h', name: 'she_buffer.h' },
+    { folder: 'core', relPath: 'src/core/she_buffer.c', name: 'she_buffer.c' },
+    { folder: 'core', relPath: 'src/core/she_config.h', name: 'she_config.h' },
+    { folder: 'core', relPath: 'src/core/she_config.c', name: 'she_config.c' },
+    { folder: 'security', relPath: 'src/security/she_security.h', name: 'she_security.h' },
+    { folder: 'security', relPath: 'src/security/she_security.c', name: 'she_security.c' },
+    { folder: 'event', relPath: 'src/event/she_fdevent.h', name: 'she_fdevent.h' },
+    { folder: 'event', relPath: 'src/event/she_fdevent.c', name: 'she_fdevent.c' },
+    { folder: 'net', relPath: 'src/net/she_net.h', name: 'she_net.h' },
+    { folder: 'net', relPath: 'src/net/she_net.c', name: 'she_net.c' },
+    { folder: 'http', relPath: 'src/http/she_http_parser.h', name: 'she_http_parser.h' },
+    { folder: 'http', relPath: 'src/http/she_http_parser.c', name: 'she_http_parser.c' },
+    { folder: 'http', relPath: 'src/http/she_mime.h', name: 'she_mime.h' },
+    { folder: 'http', relPath: 'src/http/she_mime.c', name: 'she_mime.c' },
+    { folder: 'modules', relPath: 'src/modules/she_plugin.h', name: 'she_plugin.h' },
+    { folder: 'modules', relPath: 'src/modules/she_plugin.c', name: 'she_plugin.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_auth.h', name: 'mod_auth.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_auth.c', name: 'mod_auth.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_vhost.h', name: 'mod_vhost.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_vhost.c', name: 'mod_vhost.c' },
+    { folder: 'modules', relPath: 'src/modules/mod_fastcgi.h', name: 'mod_fastcgi.h' },
+    { folder: 'modules', relPath: 'src/modules/mod_fastcgi.c', name: 'mod_fastcgi.c' },
     { folder: 'modules', relPath: 'src/modules/mod_status.h', name: 'mod_status.h' },
     { folder: 'modules', relPath: 'src/modules/mod_status.c', name: 'mod_status.c' },
     { folder: 'modules', relPath: 'src/modules/mod_indexfile.h', name: 'mod_indexfile.h' },
@@ -380,6 +415,7 @@ app.get('/api/c-server/files', (_req, res) => {
     { folder: 'modules', relPath: 'src/modules/mod_accesslog.h', name: 'mod_accesslog.h' },
     { folder: 'modules', relPath: 'src/modules/mod_accesslog.c', name: 'mod_accesslog.c' },
     { folder: 'main', relPath: 'src/main.c', name: 'main.c' },
+    { folder: 'config', relPath: 'she.conf', name: 'she.conf' },
     { folder: 'build', relPath: 'Makefile', name: 'Makefile' },
   ];
 
@@ -400,6 +436,28 @@ app.get('/api/c-server/files', (_req, res) => {
   });
 
   res.json({ files });
+});
+
+app.get('/api/c-server/config', (_req, res) => {
+  const confPath = path.join(C_SERVER_DIR, 'she.conf');
+  if (fs.existsSync(confPath)) {
+    const content = fs.readFileSync(confPath, 'utf-8');
+    res.json({ content, exists: true });
+  } else {
+    res.json({ content: '', exists: false });
+  }
+});
+
+app.post('/api/c-server/config', (req, res) => {
+  const confPath = path.join(C_SERVER_DIR, 'she.conf');
+  const { content } = req.body;
+  if (typeof content === 'string') {
+    fs.writeFileSync(confPath, content, 'utf-8');
+    appendLog('Updated she.conf configuration file');
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ error: 'content must be a string' });
+  }
 });
 
 app.get('/api/c-server/logs/access', (_req, res) => {
@@ -428,6 +486,34 @@ app.get('/api/c-server/logs/access', (_req, res) => {
 app.get('/api/c-server/plugins', (_req, res) => {
   res.json({
     plugins: [
+      {
+        name: 'she_security',
+        version: '1.0',
+        hooks: ['connection_state_machine', 'response_start'],
+        desc: 'Security hardening subsystem: IP token-bucket rate limiter, Host injection guard, smuggling check & defense headers',
+        active: true,
+      },
+      {
+        name: 'mod_auth',
+        version: '1.0',
+        hooks: ['handle_subrequest_start'],
+        desc: 'HTTP Basic Authentication (RFC 7617) protecting sensitive directory endpoints (/secure/, /admin/)',
+        active: true,
+      },
+      {
+        name: 'mod_vhost',
+        version: '1.0',
+        hooks: ['init', 'handle_uri_clean'],
+        desc: 'Virtual Host routing mapping Host headers (docs.local, api.local, secure.local) to isolated docroots',
+        active: true,
+      },
+      {
+        name: 'mod_fastcgi',
+        version: '1.0',
+        hooks: ['handle_subrequest_start'],
+        desc: 'FastCGI 1.0 binary upstream client protocol record generator & telemetry (/fastcgi)',
+        active: true,
+      },
       {
         name: 'mod_status',
         version: '1.0',
@@ -466,7 +552,7 @@ app.get('/api/c-server/download', (_req, res) => {
       return res.status(500).send('Error creating tarball');
     }
     res.setHeader('Content-Type', 'application/gzip');
-    res.setHeader('Content-Disposition', 'attachment; filename="c-lighttpd-server.tar.gz"');
+    res.setHeader('Content-Disposition', 'attachment; filename="she-server.tar.gz"');
     res.send(stdout);
   });
 });
@@ -474,8 +560,8 @@ app.get('/api/c-server/download', (_req, res) => {
 // ----------------- Vite Integration -----------------
 
 async function startServer() {
-  // Start C server immediately if binary already exists, or compile first
-  if (fs.existsSync(C_SERVER_BIN)) {
+  const bin = getCServerBin();
+  if (fs.existsSync(bin)) {
     startCServerProcess();
   } else {
     ensureCompiled().then(({ success }) => {

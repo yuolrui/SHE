@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Cpu, Zap, ArrowRight, Play, RefreshCw, Code2, CheckCircle2 } from 'lucide-react';
+import { Layers, Shield, Zap, ArrowRight, Play, RefreshCw, Code2, CheckCircle2, Lock, Globe, Server } from 'lucide-react';
 
 interface StateInfo {
   id: string;
@@ -14,26 +14,26 @@ interface StateInfo {
 const STATES: StateInfo[] = [
   {
     id: 'CONNECT',
-    name: 'CON_STATE_CONNECT',
+    name: 'SHE_CON_STATE_CONNECT',
     phase: 'Connection Setup',
-    description: 'New TCP connection accepted by network_accept_client(). Sockets are set to O_NONBLOCK and TCP_NODELAY immediately.',
-    lighttpdConcept: 'In Lighttpd, connections are decoupled from threads. The listening socket triggers EPOLLIN on epoll_wait, accepting non-blocking client fds without blocking.',
-    cSnippet: `case CON_STATE_CONNECT: {
-    con->state = CON_STATE_REQUEST_START;
+    description: 'New TCP connection accepted by she_net_accept_client(). Sockets are configured with O_NONBLOCK and TCP_NODELAY immediately.',
+    lighttpdConcept: 'In SHE & Lighttpd, connections are decoupled from threads. The listening socket triggers EPOLLIN on epoll_wait, accepting non-blocking client fds without thread overhead.',
+    cSnippet: `case SHE_CON_STATE_CONNECT: {
+    con->state = SHE_CON_STATE_REQUEST_START;
     break;
 }`,
     nextStates: ['REQUEST_START'],
   },
   {
     id: 'REQUEST_START',
-    name: 'CON_STATE_REQUEST_START',
+    name: 'SHE_CON_STATE_REQUEST_START',
     phase: 'Request Initialization',
-    description: 'Resets connection request and response buffers, registers FDEVENT_IN (EPOLLIN) on the client fd, and prepares to read HTTP wire bytes.',
-    lighttpdConcept: 'Persistent connections (Keep-Alive) loop back to this state rather than closing and re-opening sockets, avoiding 3-way TCP handshakes.',
-    cSnippet: `case CON_STATE_REQUEST_START: {
-    connection_reset(con);
-    fdevent_event_set(srv->ev, con->fd, FDEVENT_IN);
-    con->state = CON_STATE_READ;
+    description: 'Resets connection request and response buffers, registers SHE_FDEVENT_IN (EPOLLIN) on client fd, and prepares to read HTTP wire bytes.',
+    lighttpdConcept: 'Persistent connections (Keep-Alive) recycle this state rather than closing and re-opening sockets, avoiding 3-way TCP handshakes.',
+    cSnippet: `case SHE_CON_STATE_REQUEST_START: {
+    she_connection_reset(con);
+    she_fdevent_event_set(srv->ev, con->fd, SHE_FDEVENT_IN);
+    con->state = SHE_CON_STATE_READ;
     done = 1; /* Wait for epoll read event */
     break;
 }`,
@@ -41,79 +41,86 @@ const STATES: StateInfo[] = [
   },
   {
     id: 'READ',
-    name: 'CON_STATE_READ',
-    phase: 'Socket I/O (Input)',
-    description: 'Non-blocking recv() reads raw HTTP bytes into con->read_buf. Feeds bytes into http_request_parse() until complete headers are detected.',
-    lighttpdConcept: 'If recv() returns EAGAIN/EWOULDBLOCK, the state machine does not block; it parks in CON_STATE_READ and returns control to the epoll loop.',
-    cSnippet: `case CON_STATE_READ: {
-    char buf[READ_CHUNK_SIZE];
+    name: 'SHE_CON_STATE_READ',
+    phase: 'Socket I/O & Security Screening',
+    description: 'Non-blocking recv() reads raw HTTP bytes into con->read_buf. Validates request, applies token-bucket rate limiter, validates Host header, and guards against request smuggling.',
+    lighttpdConcept: 'If recv() returns EAGAIN/EWOULDBLOCK, the engine parks in SHE_CON_STATE_READ and yields control to epoll without blocking any other connections.',
+    cSnippet: `case SHE_CON_STATE_READ: {
+    char buf[SHE_READ_CHUNK_SIZE];
     ssize_t bytes = recv(con->fd, buf, sizeof(buf), 0);
     if (bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         done = 1; break;
     }
-    buffer_append_string_len(con->read_buf, buf, bytes);
-    int parse_res = http_request_parse(&con->request, ...);
-    if (parse_res == 1) con->state = CON_STATE_REQUEST_END;
+    she_buffer_append_string_len(con->read_buf, buf, bytes);
+    int parse_res = she_http_request_parse(&con->request, ...);
+    if (parse_res == 1) {
+        /* Token-bucket Rate Limiter check */
+        if (!she_security_check_rate_limit(srv->security, con->client_ip)) {
+            she_generate_error_response(srv, con, 429);
+            con->state = SHE_CON_STATE_WRITE; break;
+        }
+        con->state = SHE_CON_STATE_REQUEST_END;
+    }
     break;
 }`,
     nextStates: ['REQUEST_END', 'WRITE', 'CLOSE'],
   },
   {
     id: 'REQUEST_END',
-    name: 'CON_STATE_REQUEST_END',
+    name: 'SHE_CON_STATE_REQUEST_END',
     phase: 'Parser Validation',
     description: 'HTTP Request Line and Headers fully parsed and validated. Increments request metrics and negotiates Keep-Alive persistence.',
-    lighttpdConcept: 'Lighttpd strictly verifies HTTP/1.1 requirements (e.g., Host header presence, URI lengths, sanitization) before triggering resource handlers.',
-    cSnippet: `case CON_STATE_REQUEST_END: {
-    con->state = CON_STATE_HANDLE_REQUEST;
+    lighttpdConcept: 'Strictly verifies HTTP/1.1 requirements (RFC 7230 Host header, URI lengths, sanitization) before triggering resource handlers.',
+    cSnippet: `case SHE_CON_STATE_REQUEST_END: {
+    con->state = SHE_CON_STATE_HANDLE_REQUEST;
     break;
 }`,
     nextStates: ['HANDLE_REQUEST'],
   },
   {
     id: 'HANDLE_REQUEST',
-    name: 'CON_STATE_HANDLE_REQUEST',
-    phase: 'Routing & Handlers',
-    description: 'Resolves filesystem path against document root, neutralizes directory traversal (/../), verifies file stat, checks If-Modified-Since and Range headers.',
-    lighttpdConcept: 'This is where Lighttpd plugin hooks run (mod_indexfile, mod_dirlisting, mod_staticfile). Returns 304 if cached, or calculates byte ranges for 206.',
-    cSnippet: `case CON_STATE_HANDLE_REQUEST: {
-    /* Safe path concatenation & canonicalization */
-    snprintf(full_path, sizeof(full_path), "%s%s", srv->config.document_root, uri_path);
-    if (stat(full_path, &st) != 0) {
-        generate_error_response(con, 404, srv->config.server_tag);
-        con->state = CON_STATE_RESPONSE_START;
-        break;
-    }
-    /* Check Range: bytes=start-end -> 206 Partial Content */
+    name: 'SHE_CON_STATE_HANDLE_REQUEST',
+    phase: 'Routing, Auth & Modules',
+    description: 'Executes SHE plugin pipeline: mod_vhost resolves Host header to isolated docroot; mod_auth enforces HTTP Basic Authentication (RFC 7617); mod_fastcgi, mod_status, mod_indexfile, mod_dirlisting run.',
+    lighttpdConcept: 'Modular plugin pipeline returns SHE_HANDLER_FINISHED if intercepted (e.g. 401 Unauthorized or /server-status), or falls through to static zero-copy file serving.',
+    cSnippet: `case SHE_CON_STATE_HANDLE_REQUEST: {
+    /* Virtual host routing */
+    she_plugins_call_handle_uri_clean(srv, con);
+    /* Subrequest hooks (mod_auth, mod_status, mod_fastcgi, etc.) */
+    she_handler_t hook_res = she_plugins_call_handle_subrequest_start(srv, con);
+    if (hook_res == SHE_HANDLER_FINISHED) break;
+    /* Static file lookup & HTTP Range checking */
     ...
-    con->state = CON_STATE_RESPONSE_START;
+    con->state = SHE_CON_STATE_RESPONSE_START;
     break;
 }`,
     nextStates: ['RESPONSE_START'],
   },
   {
     id: 'RESPONSE_START',
-    name: 'CON_STATE_RESPONSE_START',
-    phase: 'Response Framing',
-    description: 'Builds HTTP status line and response headers into a memory chunk, enqueues static file fd into chunkqueue, and flips epoll to FDEVENT_OUT (EPOLLOUT).',
-    lighttpdConcept: 'Lighttpd never reads large files into RAM. It pushes an open file descriptor with offset and length into chunkqueue for kernel zero-copy transfer.',
-    cSnippet: `case CON_STATE_RESPONSE_START: {
-    fdevent_event_set(srv->ev, con->fd, FDEVENT_OUT);
-    con->state = CON_STATE_WRITE;
+    name: 'SHE_CON_STATE_RESPONSE_START',
+    phase: 'Response Framing & Security Injection',
+    description: 'Builds HTTP status line and response headers, injects defense headers (nosniff, SAMEORIGIN, XSS-Protection), enqueues file fd into chunkqueue, and arms epoll for EPOLLOUT.',
+    lighttpdConcept: 'Never reads entire files into RAM. It pushes an open file descriptor with byte offsets into chunkqueue for kernel zero-copy transfer.',
+    cSnippet: `case SHE_CON_STATE_RESPONSE_START: {
+    /* Inject security headers into response */
+    she_security_append_headers(srv->security, con);
+    she_fdevent_event_set(srv->ev, con->fd, SHE_FDEVENT_OUT);
+    con->state = SHE_CON_STATE_WRITE;
     break;
 }`,
     nextStates: ['WRITE'],
   },
   {
     id: 'WRITE',
-    name: 'CON_STATE_WRITE',
+    name: 'SHE_CON_STATE_WRITE',
     phase: 'Socket I/O (Output)',
-    description: 'Calls chunkqueue_write_chunk_to_socket(). Headers are sent via send(MSG_NOSIGNAL), while file payloads use Linux sendfile(2) zero-copy.',
+    description: 'Calls she_chunkqueue_write_chunk_to_socket(). Headers are sent via send(MSG_NOSIGNAL), while file payloads use Linux sendfile(2) zero-copy.',
     lighttpdConcept: 'sendfile(2) transfers bytes straight from page cache to socket buffers inside the Linux kernel, bypassing userspace buffer copying entirely.',
-    cSnippet: `case CON_STATE_WRITE: {
-    ssize_t w = chunkqueue_write_chunk_to_socket(con->write_queue, con->fd);
-    if (chunkqueue_is_empty(con->write_queue)) {
-        con->state = CON_STATE_RESPONSE_END;
+    cSnippet: `case SHE_CON_STATE_WRITE: {
+    ssize_t w = she_chunkqueue_write_chunk_to_socket(con->write_queue, con->fd);
+    if (she_chunkqueue_is_empty(con->write_queue)) {
+        con->state = SHE_CON_STATE_RESPONSE_END;
     } else if (w == -1) {
         done = 1; /* Wait for next EPOLLOUT */
     }
@@ -123,16 +130,16 @@ const STATES: StateInfo[] = [
   },
   {
     id: 'RESPONSE_END',
-    name: 'CON_STATE_RESPONSE_END',
+    name: 'SHE_CON_STATE_RESPONSE_END',
     phase: 'Transaction Completion',
-    description: 'Response completely sent to client. If Keep-Alive is active and within request limit, transitions back to REQUEST_START; otherwise closes.',
-    lighttpdConcept: 'By recycling the connection struct and keeping the TCP connection warm, lighttpd achieves massive throughput with sub-millisecond latencies.',
-    cSnippet: `case CON_STATE_RESPONSE_END: {
+    description: 'Response completely sent to client. Calls mod_accesslog (CLF format). If Keep-Alive is active, loops back to REQUEST_START; otherwise closes.',
+    lighttpdConcept: 'By recycling the connection struct and keeping the TCP connection warm, SHE achieves massive throughput with sub-millisecond latencies.',
+    cSnippet: `case SHE_CON_STATE_RESPONSE_END: {
+    she_plugins_call_handle_response_done(srv, con);
     if (con->keep_alive) {
-        /* Loop back to read next pipelined / keep-alive request */
-        con->state = CON_STATE_REQUEST_START;
+        con->state = SHE_CON_STATE_REQUEST_START;
     } else {
-        con->state = CON_STATE_CLOSE;
+        con->state = SHE_CON_STATE_CLOSE;
     }
     break;
 }`,
@@ -140,13 +147,13 @@ const STATES: StateInfo[] = [
   },
   {
     id: 'ERROR',
-    name: 'CON_STATE_ERROR',
+    name: 'SHE_CON_STATE_ERROR',
     phase: 'Exception Recovery',
     description: 'Catches socket broken pipes, client resets, and protocol violations. Cleans up file descriptors and transitions to CLOSE.',
     lighttpdConcept: 'Guarantees no memory leaks or dangling fds occur even when aggressive clients drop connections prematurely.',
-    cSnippet: `case CON_STATE_ERROR:
-case CON_STATE_CLOSE: {
-    server_close_connection(srv, con);
+    cSnippet: `case SHE_CON_STATE_ERROR:
+case SHE_CON_STATE_CLOSE: {
+    she_server_close_connection(srv, con);
     done = 1;
     return 0;
 }`,
@@ -154,17 +161,17 @@ case CON_STATE_CLOSE: {
   },
   {
     id: 'CLOSE',
-    name: 'CON_STATE_CLOSE',
+    name: 'SHE_CON_STATE_CLOSE',
     phase: 'Connection Tear-down',
-    description: 'Unregisters socket from epoll, closes the client fd, decrements active connection counter, and frees the connection_t memory.',
-    lighttpdConcept: 'All memory buffers allocated during the transaction are returned to the pool or freed, returning the server to baseline memory usage.',
-    cSnippet: `void server_close_connection(server_t *srv, connection_t *con) {
+    description: 'Unregisters socket from epoll, closes client fd, decrements active connection counter, and frees she_connection_t memory.',
+    lighttpdConcept: 'All memory buffers allocated during transaction are returned or freed, keeping the engine at deterministic baseline memory usage.',
+    cSnippet: `void she_server_close_connection(she_server_t *srv, she_connection_t *con) {
     int fd = con->fd;
-    fdevent_unregister(srv->ev, fd);
+    she_fdevent_unregister(srv->ev, fd);
     close(fd);
     srv->fd_to_con[fd] = NULL;
     srv->stats.active_connections--;
-    connection_free(con);
+    she_connection_free(con);
 }`,
     nextStates: [],
   },
@@ -172,8 +179,7 @@ case CON_STATE_CLOSE: {
 
 export const ArchitectureView: React.FC = () => {
   const [selectedStateId, setSelectedStateId] = useState<string>('HANDLE_REQUEST');
-  const [simIndex, setSimIndex] = useState<number>(0);
-  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [simIndex, setSimIndex] = useState<number>(4);
 
   const activeState = STATES.find((s) => s.id === selectedStateId) || STATES[0];
 
@@ -186,7 +192,6 @@ export const ArchitectureView: React.FC = () => {
   const handleResetSimulation = () => {
     setSimIndex(0);
     setSelectedStateId(STATES[0].id);
-    setIsSimulating(false);
   };
 
   return (
@@ -196,30 +201,31 @@ export const ArchitectureView: React.FC = () => {
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-3xl">
             <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-              <span>Lighttpd Architecture in Pure C</span>
+              <span className="text-emerald-400 font-bold">SHE: Secure HTTP Engine</span>
               <span aria-hidden="true">·</span>
-              <span>Single-Process Non-Blocking I/O</span>
+              <span>she_ Keyword Prefix</span>
               <span aria-hidden="true">·</span>
-              <span>Linux epoll(7) Engine</span>
+              <span>Single-Process Non-Blocking epoll</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Lighttpd-Style Connection State Machine
+              Secure HTTP Engine (SHE) Architecture
             </h1>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Unlike traditional threaded servers (such as Apache prefork) that dedicate a thread or process per
-              client, <strong className="text-sky-400">c-lighttpd</strong> mirrors lighttpd&apos;s pioneering
-              single-process event loop. Every HTTP connection is modeled as an explicit 10-state finite state machine (FSM).
-              Sockets never block; when kernel buffers fill or drain, the state machine yields to epoll and resumes instantly.
+              <strong className="text-emerald-400">SHE (Secure HTTP Engine)</strong> is an industrial-grade C web server
+              combining Lighttpd&apos;s iconic 10-state non-blocking finite state machine (FSM) with hardened security subsystems.
+              All types and functions use the standardized <code className="text-emerald-300 font-mono">she_</code> prefix.
+              It features built-in token-bucket IP rate limiting, RFC 7617 HTTP Basic Authentication, virtual host routing,
+              zero-copy <code className="text-emerald-300 font-mono">sendfile(2)</code>, and FastCGI protocol framing.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
             <button
               onClick={handleStepSimulation}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-colors shadow-sm"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors shadow-sm"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Step FSM Simulation ({STATES[simIndex].name})</span>
+              <span>Step FSM Simulation ({STATES[simIndex].name.replace('SHE_CON_STATE_', '')})</span>
             </button>
             <button
               onClick={handleResetSimulation}
@@ -231,41 +237,45 @@ export const ArchitectureView: React.FC = () => {
           </div>
         </div>
 
-        {/* 3 Core Architecture Pillars */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-slate-800/80">
+        {/* 4 Core Architecture Pillars */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8 pt-8 border-t border-slate-800/80">
           <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-2">
-            <div className="flex items-center gap-2 text-sky-400 font-semibold text-xs uppercase tracking-wider">
-              <Cpu className="w-4 h-4" />
-              <span>fdevent Subsystem</span>
+            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs uppercase tracking-wider">
+              <Shield className="w-4 h-4" />
+              <span>she_security</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Wraps Linux <code className="text-slate-300 font-mono">epoll_create1</code>,{' '}
-              <code className="text-slate-300 font-mono">epoll_ctl</code>, and{' '}
-              <code className="text-slate-300 font-mono">epoll_wait</code>. Tracks active connection fds and dispatches
-              I/O readiness events with zero context-switch overhead.
+              Token-bucket per-IP rate limiter (429 Too Many Requests), Host header validation, HTTP request smuggling guard, and automatic security response headers.
             </p>
           </div>
 
           <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-2">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs uppercase tracking-wider">
-              <Zap className="w-4 h-4" />
-              <span>Zero-Copy Chunkqueue</span>
+            <div className="flex items-center gap-2 text-sky-400 font-semibold text-xs uppercase tracking-wider">
+              <Lock className="w-4 h-4" />
+              <span>mod_auth (Basic)</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Decouples HTTP response generation from transmission. Dynamically generated headers sit in{' '}
-              <code className="text-slate-300 font-mono">CHUNK_MEM</code>, while files use Linux{' '}
-              <code className="text-slate-300 font-mono">sendfile(2)</code> directly from disk cache to TCP socket.
+              RFC 7617 HTTP Basic Authentication with base64 decoding. Protects sensitive directories (e.g. <code className="text-slate-300 font-mono">/secure/</code>) with 401 challenges.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-2">
+            <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs uppercase tracking-wider">
+              <Globe className="w-4 h-4" />
+              <span>mod_vhost Routing</span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Virtual Host router mapping incoming <code className="text-slate-300 font-mono">Host:</code> headers to isolated document roots (e.g. <code className="text-slate-300 font-mono">docs.local</code>, <code className="text-slate-300 font-mono">api.local</code>).
             </p>
           </div>
 
           <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-2">
             <div className="flex items-center gap-2 text-purple-400 font-semibold text-xs uppercase tracking-wider">
-              <Layers className="w-4 h-4" />
-              <span>Buffer Memory Pooling</span>
+              <Zap className="w-4 h-4" />
+              <span>Zero-Copy sendfile</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Avoids memory fragmentation with lighttpd-style <code className="text-slate-300 font-mono">buffer_t</code>{' '}
-              structures. Buffers track allocated capacity and reused lengths, eliminating malloc/free churn during high-concurrency spikes.
+              Lighttpd-style chunkqueue streaming headers via memory chunks and large static payloads via Linux <code className="text-slate-300 font-mono">sendfile(2)</code> straight from page cache.
             </p>
           </div>
         </div>
@@ -275,10 +285,10 @@ export const ArchitectureView: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-white tracking-tight">10-State Connection Flowchart</h2>
-            <p className="text-xs text-slate-400">Click any state to view its architectural purpose and C implementation.</p>
+            <h2 className="text-lg font-bold text-white tracking-tight">SHE 10-State Connection FSM Flowchart</h2>
+            <p className="text-xs text-slate-400">Click any state to inspect its security role and C implementation.</p>
           </div>
-          <span className="text-xs font-mono text-sky-400 bg-sky-950/50 border border-sky-800/50 px-2.5 py-1 rounded">
+          <span className="text-xs font-mono text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2.5 py-1 rounded">
             Selected: {activeState.name}
           </span>
         </div>
@@ -298,7 +308,7 @@ export const ArchitectureView: React.FC = () => {
                 }}
                 className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
                   isSelected
-                    ? 'bg-slate-800 border-sky-500 shadow-md ring-1 ring-sky-500/30'
+                    ? 'bg-slate-800 border-emerald-500 shadow-md ring-1 ring-emerald-500/30'
                     : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/50'
                 } ${isSimCurrent ? 'ring-2 ring-emerald-500/80' : ''}`}
               >
@@ -311,7 +321,7 @@ export const ArchitectureView: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-semibold text-slate-200 font-mono truncate">{state.name.replace('CON_STATE_', '')}</span>
+                <span className="text-xs font-semibold text-slate-200 font-mono truncate">{state.name.replace('SHE_CON_STATE_', '')}</span>
                 <span className="text-[11px] text-slate-400 truncate mt-0.5">{state.phase}</span>
               </button>
             );
@@ -324,17 +334,17 @@ export const ArchitectureView: React.FC = () => {
         {/* State Explanation (5 cols) */}
         <div className="lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-xl p-6 space-y-5">
           <div className="space-y-1">
-            <span className="text-xs font-mono text-sky-400">{activeState.phase}</span>
+            <span className="text-xs font-mono text-emerald-400">{activeState.phase}</span>
             <h3 className="text-xl font-bold text-white font-mono">{activeState.name}</h3>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Functional Role</h4>
+            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Functional & Security Role</h4>
             <p className="text-xs text-slate-300 leading-relaxed">{activeState.description}</p>
           </div>
 
           <div className="space-y-3 pt-3 border-t border-slate-800">
-            <h4 className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Lighttpd Design Principle</h4>
+            <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Lighttpd Design Principle</h4>
             <p className="text-xs text-slate-400 leading-relaxed">{activeState.lighttpdConcept}</p>
           </div>
 
@@ -350,9 +360,9 @@ export const ArchitectureView: React.FC = () => {
                       const targetIdx = STATES.findIndex((s) => s.id === next);
                       if (targetIdx >= 0) setSimIndex(targetIdx);
                     }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono bg-slate-800 hover:bg-slate-700 text-sky-300 rounded border border-slate-700 transition-colors"
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded border border-slate-700 transition-colors"
                   >
-                    <span>CON_STATE_{next}</span>
+                    <span>SHE_CON_STATE_{next}</span>
                     <ArrowRight className="w-3 h-3 text-slate-400" />
                   </button>
                 ))
@@ -367,8 +377,8 @@ export const ArchitectureView: React.FC = () => {
         <div className="lg:col-span-7 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800 text-xs">
             <div className="flex items-center gap-2 text-slate-300 font-mono">
-              <Code2 className="w-4 h-4 text-sky-400" />
-              <span>c_server/src/core/connection.c : connection_state_machine()</span>
+              <Code2 className="w-4 h-4 text-emerald-400" />
+              <span>c_server/src/core/she_connection.c : she_connection_state_machine()</span>
             </div>
             <span className="text-[11px] text-slate-400 font-mono">C11 / Linux epoll</span>
           </div>
@@ -383,7 +393,7 @@ export const ArchitectureView: React.FC = () => {
             <span>Non-blocking dispatch loop verified warning-free with GCC -Wall -Wextra</span>
             <div className="flex items-center gap-1.5 text-emerald-400">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Compiled & Active</span>
+              <span>Compiled & Active (Binary: she)</span>
             </div>
           </div>
         </div>

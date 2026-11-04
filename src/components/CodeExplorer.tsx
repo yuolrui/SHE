@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCode, Folder, Copy, Check, Download, Search, Terminal, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileCode, Folder, Copy, Check, Download, Search, Terminal, Info } from 'lucide-react';
 
 interface FileData {
   path: string;
@@ -11,38 +11,62 @@ interface FileData {
 }
 
 const FILE_NOTES: Record<string, string> = {
-  'src/core/connection.c': 'Core Lighttpd Connection State Machine. Drives non-blocking state transitions, chunkqueue output, and persistent Keep-Alive loops.',
-  'src/core/connection.h': 'Header defining connection_t, the connection_state_t 10-state enum, and state engine signatures.',
-  'src/core/chunkqueue.c': 'Zero-copy response queue. Handles CHUNK_TYPE_MEM for headers/error bodies and CHUNK_TYPE_FILE with Linux sendfile(2) for disk files.',
-  'src/core/chunkqueue.h': 'Chunk queue struct definitions and non-blocking socket chunk streaming declarations.',
-  'src/core/buffer.c': 'Lighttpd iconic dynamic buffer pool. Reduces malloc/free cycles by tracking pre-allocated capacity.',
-  'src/core/buffer.h': 'buffer_t struct and dynamic string manipulation macros and helper functions.',
-  'src/core/server.c': 'Main server runtime structure, epoll event dispatching loop, SIGINT/SIGTERM handlers, and idle connection reaper.',
-  'src/core/server.h': 'server_t struct, server_config_t, server_stats_t metrics counters.',
-  'src/event/fdevent.c': 'Linux epoll abstraction layer. Implements epoll_create1, epoll_ctl, and epoll_wait event multiplexing loop.',
-  'src/event/fdevent.h': 'fdevent_system_t definition, FDEVENT_IN, FDEVENT_OUT, FDEVENT_ERR flags, and callback prototypes.',
-  'src/net/network.c': 'Low-level socket creation, non-blocking fcntl(O_NONBLOCK), TCP_NODELAY, SO_REUSEADDR, and accept handling.',
-  'src/net/network.h': 'Socket setup declarations and network helper function prototypes.',
-  'src/http/http_parser.c': 'HTTP/1.1 request line and header parser with strict path traversal sanitization, URL decoding, and Range header support.',
-  'src/http/http_parser.h': 'http_request_t struct, HTTP method enums, and header key-value lookup structures.',
-  'src/http/mime_types.c': 'Fast static extension-to-MIME-type mapping table (HTML, CSS, JS, JSON, images, fonts, WASM).',
-  'src/http/mime_types.h': 'MIME lookup declaration.',
-  'src/main.c': 'Server entry point, CLI argument parser (-p, -d, -k, -m, -v), signal handlers, and startup banner.',
+  'src/core/she_server.c': 'SHE Server core orchestrator. Manages socket listener, epoll event dispatching, signal handling, and plugin pipeline initialization.',
+  'src/core/she_server.h': 'Header for she_server_t, she_server_config_t, and server response code counters.',
+  'src/core/she_connection.c': 'SHE 10-State Connection State Machine. Drives non-blocking I/O, security checks (rate limiting, Host header, smuggling), and zero-copy chunkqueue.',
+  'src/core/she_connection.h': 'Header defining she_connection_t, she_con_state_t 10-state enum, and state engine driver signatures.',
+  'src/core/she_config.c': 'Runtime configuration file parser. Reads she.conf directives for bindings, security, auth, and virtual hosts.',
+  'src/core/she_config.h': 'Configuration loader API prototypes.',
+  'src/core/she_chunkqueue.c': 'Zero-copy response queue. Handles SHE_CHUNK_TYPE_MEM for headers and SHE_CHUNK_TYPE_FILE with Linux sendfile(2) zero-copy.',
+  'src/core/she_chunkqueue.h': 'Chunk queue structures and non-blocking socket chunk streaming declarations.',
+  'src/core/she_buffer.c': 'SHE dynamic buffer memory allocator with bounds-checked operations to eliminate buffer overflow risks.',
+  'src/core/she_buffer.h': 'she_buffer_t struct and dynamic string manipulation functions.',
+  'src/security/she_security.c': 'SHE Security Hardening engine. Implements per-IP token-bucket rate limiter, Host header RFC validation, smuggling guards, and defense headers injection.',
+  'src/security/she_security.h': 'Security config, rate bucket hash table, and security API signatures.',
+  'src/modules/she_plugin.c': 'Lighttpd-style modular plugin pipeline manager. Executes lifecycle and request hooks (URI clean, subrequest start, response done).',
+  'src/modules/she_plugin.h': 'she_plugin_t, she_handler_t return codes (SHE_HANDLER_GO_ON, FINISHED, ERROR).',
+  'src/modules/mod_auth.c': 'HTTP Basic Authentication (RFC 7617) plugin with base64 decoding. Protects /secure/ and /admin/ with 401 challenges.',
+  'src/modules/mod_auth.h': 'mod_auth plugin declaration.',
+  'src/modules/mod_vhost.c': 'Virtual Host routing plugin. Maps Host header to isolated document roots (docs.local, api.local, secure.local).',
+  'src/modules/mod_vhost.h': 'mod_vhost plugin declaration.',
+  'src/modules/mod_fastcgi.c': 'FastCGI 1.0 upstream client protocol record generator. Constructs binary FCGI_BEGIN_REQUEST, FCGI_PARAMS, and inspects upstream telemetry.',
+  'src/modules/mod_fastcgi.h': 'FastCGI 1.0 protocol binary structures and record headers.',
+  'src/modules/mod_status.c': 'SHE online runtime metrics and performance dashboard (/server-status and /server-status?json).',
+  'src/modules/mod_status.h': 'mod_status plugin declaration.',
+  'src/modules/mod_indexfile.c': 'Directory index resolution cascade (index.html, index.htm, default.html).',
+  'src/modules/mod_indexfile.h': 'mod_indexfile plugin declaration.',
+  'src/modules/mod_dirlisting.c': 'Dynamic interactive HTML directory indexing for folders without index files.',
+  'src/modules/mod_dirlisting.h': 'mod_dirlisting plugin declaration.',
+  'src/modules/mod_accesslog.c': 'Standard Combined Log Format (CLF) request logger writing to logs/access.log.',
+  'src/modules/mod_accesslog.h': 'mod_accesslog plugin declaration.',
+  'src/event/she_fdevent.c': 'Linux epoll abstraction layer. Implements epoll_create1, epoll_ctl, and epoll_wait event multiplexing loop.',
+  'src/event/she_fdevent.h': 'she_fdevent_system_t definition, SHE_FDEVENT_IN, SHE_FDEVENT_OUT, and callback prototypes.',
+  'src/net/she_net.c': 'Low-level socket creation, non-blocking fcntl(O_NONBLOCK), TCP_NODELAY, SO_REUSEADDR, and accept handling.',
+  'src/net/she_net.h': 'Network helper function prototypes.',
+  'src/http/she_http_parser.c': 'HTTP/1.1 request line and header parser with strict path traversal sanitization, URL decoding, and Range header support.',
+  'src/http/she_http_parser.h': 'she_http_request_t struct, HTTP method enums, and header key-value lookup structures.',
+  'src/http/she_mime.c': 'Fast static extension-to-MIME-type mapping table (HTML, CSS, JS, JSON, images, fonts, WASM, conf).',
+  'src/http/she_mime.h': 'MIME lookup declaration.',
+  'src/main.c': 'SHE entry point, CLI argument parser (-c, -p, -d, -k, -m, -v), signal handlers, and ASCII banner.',
+  'she.conf': 'SHE server runtime configuration file. Directives for server, security rate limiting, auth, and virtual hosts.',
   'Makefile': 'Modular GCC build recipe targeting C11, -Wall, -Wextra, -O2, and subfolder compilation.',
 };
 
 const FOLDER_LABELS: Record<string, { label: string; desc: string }> = {
   core: { label: 'src/core/', desc: 'State Machine & Memory' },
+  security: { label: 'src/security/', desc: 'Rate Limiter & Hardening' },
+  modules: { label: 'src/modules/', desc: 'Plugins (auth, vhost, fastcgi)' },
   event: { label: 'src/event/', desc: 'epoll(7) Multiplexer' },
   net: { label: 'src/net/', desc: 'TCP & Socket Layer' },
   http: { label: 'src/http/', desc: 'Parser & MIME Mapping' },
-  main: { label: 'src/', desc: 'Entry Point' },
+  main: { label: 'src/', desc: 'Server Entry Point' },
+  config: { label: 'config/', desc: 'Runtime she.conf' },
   build: { label: './', desc: 'Build Configuration' },
 };
 
 export const CodeExplorer: React.FC = () => {
   const [files, setFiles] = useState<FileData[]>([]);
-  const [selectedFilePath, setSelectedFilePath] = useState<string>('src/core/connection.c');
+  const [selectedFilePath, setSelectedFilePath] = useState<string>('src/security/she_security.c');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -81,7 +105,6 @@ export const CodeExplorer: React.FC = () => {
       f.path.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Group files by folder
   const groupedFiles: Record<string, FileData[]> = {};
   filteredFiles.forEach((f) => {
     const key = f.folder || 'other';
@@ -96,11 +119,12 @@ export const CodeExplorer: React.FC = () => {
       {/* Header bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Structured C Source Repository</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">SHE (Secure HTTP Engine) C Source Repository</h2>
           <p className="text-xs text-slate-400">
-            Organized into standard systems architecture modules (<code className="text-slate-300">core/</code>,{' '}
-            <code className="text-slate-300">event/</code>, <code className="text-slate-300">net/</code>,{' '}
-            <code className="text-slate-300">http/</code>) modeled after Lighttpd & Nginx.
+            Organized with standard <code className="text-emerald-300 font-mono">she_</code> keyword prefixes into subsystems:
+            (<code className="text-slate-300">core/</code>, <code className="text-slate-300">security/</code>,{' '}
+            <code className="text-slate-300">modules/</code>, <code className="text-slate-300">event/</code>,{' '}
+            <code className="text-slate-300">net/</code>, <code className="text-slate-300">http/</code>).
           </p>
         </div>
 
@@ -114,10 +138,10 @@ export const CodeExplorer: React.FC = () => {
           </button>
           <a
             href="/api/c-server/download"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-md transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-md transition-colors shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Download Project (.tar.gz)</span>
+            <span>Download C Code (.tar.gz)</span>
           </a>
         </div>
       </div>
@@ -133,7 +157,7 @@ export const CodeExplorer: React.FC = () => {
               placeholder="Search by path or filename..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+              className="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
@@ -144,7 +168,7 @@ export const CodeExplorer: React.FC = () => {
                 <div key={folderKey} className="space-y-1">
                   <div className="flex items-center justify-between px-2 py-1 text-[11px] font-mono text-slate-400">
                     <div className="flex items-center gap-1.5 font-semibold text-slate-300">
-                      <Folder className="w-3.5 h-3.5 text-sky-400" />
+                      <Folder className="w-3.5 h-3.5 text-emerald-400" />
                       <span>{meta.label}</span>
                     </div>
                     <span className="text-[10px] text-slate-500">{meta.desc}</span>
@@ -155,6 +179,8 @@ export const CodeExplorer: React.FC = () => {
                       const isSelected = f.path === selectedFilePath;
                       const isHeader = f.name.endsWith('.h');
                       const isMakefile = f.name === 'Makefile';
+                      const isConf = f.name.endsWith('.conf');
+                      const isSecurity = f.folder === 'security' || f.name.includes('security') || f.name.includes('auth');
 
                       return (
                         <button
@@ -162,14 +188,14 @@ export const CodeExplorer: React.FC = () => {
                           onClick={() => setSelectedFilePath(f.path)}
                           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-mono transition-colors text-left ${
                             isSelected
-                              ? 'bg-sky-950/60 text-sky-400 border border-sky-800/60 font-semibold'
+                              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-semibold'
                               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                           }`}
                         >
                           <div className="flex items-center gap-2 truncate">
                             <FileCode
                               className={`w-3.5 h-3.5 shrink-0 ${
-                                isHeader ? 'text-amber-400' : isMakefile ? 'text-rose-400' : 'text-sky-400'
+                                isSecurity ? 'text-emerald-400' : isHeader ? 'text-amber-400' : isMakefile || isConf ? 'text-purple-400' : 'text-sky-400'
                               }`}
                             />
                             <span className="truncate">{f.name}</span>
@@ -208,15 +234,15 @@ export const CodeExplorer: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
-              <Terminal className="w-3 h-3 text-sky-400" />
-              <span>GCC C11 Modular Build</span>
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              <span>SHE (C11 / Linux epoll)</span>
             </div>
           </div>
 
           {/* Architectural note banner */}
           {(FILE_NOTES[selectedFile?.path || ''] || FILE_NOTES[selectedFile?.name || '']) && (
             <div className="px-5 py-2.5 bg-slate-900/40 border-b border-slate-800/60 text-xs text-slate-300 flex items-start gap-2.5">
-              <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
                 {FILE_NOTES[selectedFile?.path || ''] || FILE_NOTES[selectedFile?.name || '']}
               </p>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Activity, FileText, CheckCircle2, RefreshCw, Send, Terminal, ExternalLink } from 'lucide-react';
+import { Layers, ShieldCheck, FileText, CheckCircle2, RefreshCw, Settings, Save, Lock, Globe, Terminal } from 'lucide-react';
 
 interface PluginInfo {
   name: string;
@@ -12,14 +12,17 @@ interface PluginInfo {
 export const PluginsView: React.FC = () => {
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const [accessLogs, setAccessLogs] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [confContent, setConfContent] = useState<string>('');
+  const [isSavingConf, setIsSavingConf] = useState<boolean>(false);
+  const [confSavedMessage, setConfSavedMessage] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
   const fetchData = async () => {
     try {
-      const [pluginsRes, logsRes] = await Promise.all([
+      const [pluginsRes, logsRes, confRes] = await Promise.all([
         fetch('/api/c-server/plugins'),
         fetch('/api/c-server/logs/access'),
+        fetch('/api/c-server/config'),
       ]);
 
       if (pluginsRes.ok) {
@@ -30,10 +33,12 @@ export const PluginsView: React.FC = () => {
         const lData = await logsRes.json();
         if (lData.lines) setAccessLogs(lData.lines);
       }
+      if (confRes.ok) {
+        const cData = await confRes.json();
+        if (cData.content) setConfContent(cData.content);
+      }
     } catch {
       // Silently ignore network hiccup
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -44,8 +49,24 @@ export const PluginsView: React.FC = () => {
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  const handleTestStatus = () => {
-    window.open('http://127.0.0.1:8899/server-status', '_blank');
+  const handleSaveConfig = async () => {
+    setIsSavingConf(true);
+    setConfSavedMessage(null);
+    try {
+      const res = await fetch('/api/c-server/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: confContent }),
+      });
+      if (res.ok) {
+        setConfSavedMessage('Configuration saved to c_server/she.conf successfully!');
+        setTimeout(() => setConfSavedMessage(null), 3000);
+      }
+    } catch {
+      setConfSavedMessage('Failed to save configuration.');
+    } finally {
+      setIsSavingConf(false);
+    }
   };
 
   return (
@@ -53,20 +74,22 @@ export const PluginsView: React.FC = () => {
       {/* Intro Header */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
         <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mb-2">
-          <span>Phase 2: Modular Architecture</span>
+          <span className="text-emerald-400 font-bold">SHE: Phase 3 Active</span>
           <span aria-hidden="true">·</span>
-          <span>Lighttpd plugin_t Hook System</span>
+          <span>Lighttpd-style she_plugin_t Subsystem</span>
           <span aria-hidden="true">·</span>
-          <span>4 Built-in Core Modules</span>
+          <span>8 Core Security & I/O Modules</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
-          Lighttpd Modular Plugin Subsystem
+          SHE Modular Pipeline & Configuration Workbench
         </h2>
         <p className="text-xs text-slate-300 leading-relaxed max-w-3xl mt-1">
-          In Lighttpd, modules register function pointers into distinct hook phases of the request lifecycle.
-          The core server remains clean and minimal while features like <code className="text-sky-300">mod_status</code>,{' '}
-          <code className="text-sky-300">mod_indexfile</code>, <code className="text-sky-300">mod_dirlisting</code>, and{' '}
-          <code className="text-sky-300">mod_accesslog</code> run as decoupled plugins.
+          SHE&apos;s modular architecture decouples high-level HTTP features into isolated plugins that hook into URI cleaning,
+          subrequest evaluation, and response finalization. Built-in modules include <code className="text-emerald-300">she_security</code>,{' '}
+          <code className="text-emerald-300">mod_auth</code>, <code className="text-emerald-300">mod_vhost</code>,{' '}
+          <code className="text-emerald-300">mod_fastcgi</code>, <code className="text-emerald-300">mod_status</code>,{' '}
+          <code className="text-emerald-300">mod_indexfile</code>, <code className="text-emerald-300">mod_dirlisting</code>, and{' '}
+          <code className="text-emerald-300">mod_accesslog</code>.
         </p>
       </div>
 
@@ -74,49 +97,95 @@ export const PluginsView: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider">Registered Active Modules</h3>
-          <span className="text-xs text-slate-400 font-mono">4 Plugins Initialized</span>
+          <span className="text-xs text-slate-400 font-mono">{plugins.length} Subsystems Initialized</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {plugins.map((p) => (
-            <div
-              key={p.name}
-              className="p-5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3 relative overflow-hidden"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
-                    <Layers className="w-4 h-4" />
+          {plugins.map((p) => {
+            const isSecurityModule = p.name.includes('security') || p.name.includes('auth');
+            return (
+              <div
+                key={p.name}
+                className="p-5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3 relative overflow-hidden"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      isSecurityModule
+                        ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                        : 'bg-sky-500/10 border border-sky-500/30 text-sky-400'
+                    }`}>
+                      {isSecurityModule ? <ShieldCheck className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white font-mono">{p.name}</h4>
+                      <span className="text-[11px] text-slate-400 font-mono">v{p.version} · Active</span>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white font-mono">{p.name}</h4>
-                    <span className="text-[11px] text-slate-400 font-mono">v{p.version} · Active</span>
+
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Hooked</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Hooked</span>
+                <p className="text-xs text-slate-300 leading-relaxed">{p.desc}</p>
+
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-500 text-[11px]">Lifecycle Hooks:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {p.hooks.map((h) => (
+                      <span
+                        key={h}
+                        className="px-2 py-0.5 rounded bg-slate-800 text-emerald-300 text-[10px] border border-slate-700/60"
+                      >
+                        {h}()
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed">{p.desc}</p>
-
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-500 text-[11px]">Hooks:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {p.hooks.map((h) => (
-                    <span
-                      key={h}
-                      className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 text-[10px] border border-slate-700/60"
-                    >
-                      {h}()
-                    </span>
-                  ))}
-                </div>
-              </div>
+      {/* Configuration File Editor (she.conf) */}
+      <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col space-y-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-3.5 bg-slate-900 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <Settings className="w-4 h-4 text-emerald-400" />
+            <div>
+              <span className="text-xs font-bold text-white font-mono">c_server/she.conf (Runtime Directives)</span>
+              <p className="text-[11px] text-slate-400">Controls bindings, rate limits, basic auth realms, and virtual hosts</p>
             </div>
-          ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {confSavedMessage && (
+              <span className="text-xs text-emerald-400 font-mono flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                {confSavedMessage}
+              </span>
+            )}
+            <button
+              onClick={handleSaveConfig}
+              disabled={isSavingConf}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSavingConf ? 'Saving...' : 'Save she.conf'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-950">
+          <textarea
+            value={confContent}
+            onChange={(e) => setConfContent(e.target.value)}
+            rows={12}
+            className="w-full bg-slate-900/60 border border-slate-800 rounded-lg p-3 font-mono text-xs text-emerald-300 placeholder-slate-600 focus:outline-none focus:border-emerald-500 leading-relaxed"
+          />
         </div>
       </div>
 
@@ -124,7 +193,7 @@ export const PluginsView: React.FC = () => {
       <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col space-y-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-3.5 bg-slate-900 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
-            <FileText className="w-4 h-4 text-sky-400" />
+            <FileText className="w-4 h-4 text-emerald-400" />
             <div>
               <span className="text-xs font-bold text-white font-mono">logs/access.log (mod_accesslog)</span>
               <p className="text-[11px] text-slate-400">Standard Common Log Format (CLF) / Combined HTTP Stream</p>
@@ -155,13 +224,15 @@ export const PluginsView: React.FC = () => {
         <div className="p-4 font-mono text-xs max-h-72 overflow-y-auto bg-slate-950 text-slate-300 space-y-1">
           {accessLogs.length === 0 ? (
             <div className="py-12 text-center text-slate-500">
-              No access logs recorded yet. Send requests from the Live Tester tab to see mod_accesslog stream output in real-time.
+              No access logs recorded yet. Send requests from the Security & Tester tab to see mod_accesslog stream output in real-time.
             </div>
           ) : (
             accessLogs.map((log, idx) => {
               const is200 = log.includes(' 200 ');
               const is206 = log.includes(' 206 ');
               const is304 = log.includes(' 304 ');
+              const is401 = log.includes(' 401 ');
+              const is429 = log.includes(' 429 ');
               const is404 = log.includes(' 404 ');
 
               return (
@@ -173,8 +244,12 @@ export const PluginsView: React.FC = () => {
                         ? 'text-emerald-300'
                         : is304
                         ? 'text-sky-300'
-                        : is404
+                        : is401
                         ? 'text-amber-300'
+                        : is429
+                        ? 'text-rose-400 font-semibold'
+                        : is404
+                        ? 'text-amber-400'
                         : 'text-slate-300'
                     }`}
                   >

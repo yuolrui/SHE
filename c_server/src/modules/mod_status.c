@@ -1,6 +1,6 @@
 #include "modules/mod_status.h"
-#include "core/server.h"
-#include "core/connection.h"
+#include "core/she_server.h"
+#include "core/she_connection.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -11,11 +11,11 @@ static void get_http_date(time_t t, char *buf, size_t max) {
     strftime(buf, max, "%a, %d %b %Y %H:%M:%S GMT", &tm);
 }
 
-static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, void *p_data) {
+static she_handler_t mod_status_subrequest_start(she_server_t *srv, she_connection_t *con, void *p_data) {
     (void)p_data;
-    const char *uri = buffer_cstr(con->request.uri_path);
+    const char *uri = she_buffer_cstr(con->request.uri_path);
     if (!uri || strcmp(uri, "/server-status") != 0) {
-        return HANDLER_GO_ON;
+        return SHE_HANDLER_GO_ON;
     }
     
     time_t now = time(NULL);
@@ -23,15 +23,19 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
     if (uptime <= 0) uptime = 1;
     
     double rps = (double)srv->stats.total_requests / uptime;
-    const char *query = buffer_cstr(con->request.uri_query);
+    const char *query = she_buffer_cstr(con->request.uri_query);
     int is_json = (query && (strstr(query, "json") != NULL || strstr(query, "format=json") != NULL));
     
-    buffer_t *body = buffer_init_size(2048);
+    she_buffer_t *body = she_buffer_init_size(2048);
+    
+    uint64_t rate_blocks = srv->security ? srv->security->total_rate_blocks : 0;
+    uint64_t host_blocks = srv->security ? srv->security->total_host_rejections : 0;
     
     if (is_json) {
-        buffer_append_printf(body,
+        she_buffer_append_printf(body,
             "{\n"
             "  \"server\": \"%s\",\n"
+            "  \"engine\": \"SHE (Secure HTTP Engine)\",\n"
             "  \"uptime_seconds\": %.0f,\n"
             "  \"total_connections\": %llu,\n"
             "  \"active_connections\": %u,\n"
@@ -39,13 +43,22 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
             "  \"requests_per_second\": %.2f,\n"
             "  \"bytes_read\": %llu,\n"
             "  \"bytes_written\": %llu,\n"
+            "  \"security\": {\n"
+            "    \"rate_limiting_active\": %d,\n"
+            "    \"rate_limit_blocks\": %llu,\n"
+            "    \"host_header_rejections\": %llu,\n"
+            "    \"headers_injected\": %d\n"
+            "  },\n"
             "  \"status_codes\": {\n"
             "    \"200\": %llu,\n"
             "    \"206\": %llu,\n"
             "    \"304\": %llu,\n"
             "    \"400\": %llu,\n"
+            "    \"401\": %llu,\n"
             "    \"403\": %llu,\n"
             "    \"404\": %llu,\n"
+            "    \"405\": %llu,\n"
+            "    \"429\": %llu,\n"
             "    \"500\": %llu\n"
             "  }\n"
             "}\n",
@@ -57,20 +70,27 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
             rps,
             (unsigned long long)srv->stats.bytes_read,
             (unsigned long long)srv->stats.bytes_written,
+            srv->security && srv->security->config.enable_rate_limit ? 1 : 0,
+            (unsigned long long)rate_blocks,
+            (unsigned long long)host_blocks,
+            srv->security && srv->security->config.enable_security_headers ? 1 : 0,
             (unsigned long long)srv->stats.status_200,
             (unsigned long long)srv->stats.status_206,
             (unsigned long long)srv->stats.status_304,
             (unsigned long long)srv->stats.status_400,
+            (unsigned long long)srv->stats.status_401,
             (unsigned long long)srv->stats.status_403,
             (unsigned long long)srv->stats.status_404,
+            (unsigned long long)srv->stats.status_405,
+            (unsigned long long)srv->stats.status_429,
             (unsigned long long)srv->stats.status_500
         );
     } else {
-        buffer_append_printf(body,
+        she_buffer_append_printf(body,
             "<!DOCTYPE html>\n"
             "<html>\n"
             "<head>\n"
-            "  <title>c-lighttpd Server Status</title>\n"
+            "  <title>SHE Server Status</title>\n"
             "  <style>\n"
             "    body { font-family: system-ui, sans-serif; background: #0b0f19; color: #f1f5f9; padding: 40px; margin: 0; }\n"
             "    .card { max-width: 760px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 30px; }\n"
@@ -87,7 +107,7 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
             "</head>\n"
             "<body>\n"
             "  <div class=\"card\">\n"
-            "    <h1>c-lighttpd Status (mod_status)</h1>\n"
+            "    <h1>SHE Server Status (Secure HTTP Engine)</h1>\n"
             "    <p>Server Version: <strong>%s</strong> · Model: Single-process epoll + 10-state FSM</p>\n"
             "    <div class=\"grid\">\n"
             "      <div class=\"item\"><div class=\"item-val\">%.0f s</div><div class=\"item-lbl\">Uptime</div></div>\n"
@@ -95,18 +115,27 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
             "      <div class=\"item\"><div class=\"item-val\">%llu</div><div class=\"item-lbl\">Total Requests</div></div>\n"
             "      <div class=\"item\"><div class=\"item-val\">%.1f req/s</div><div class=\"item-lbl\">Average Throughput</div></div>\n"
             "    </div>\n"
+            "    <h3>Security Metrics (she_security)</h3>\n"
+            "    <table>\n"
+            "      <tr><th>Metric</th><th>Status</th></tr>\n"
+            "      <tr><td>IP Rate Limiting Blocks (429)</td><td>%llu</td></tr>\n"
+            "      <tr><td>Host Header Rejections</td><td>%llu</td></tr>\n"
+            "      <tr><td>Security Headers Injection</td><td>Active (nosniff, SAMEORIGIN, XSS-1)</td></tr>\n"
+            "    </table>\n"
             "    <h3>HTTP Response Distribution</h3>\n"
             "    <table>\n"
             "      <tr><th>Status Code</th><th>Meaning</th><th>Count</th></tr>\n"
-            "      <tr><td style=\"color:#34d399;\">200</td><td>OK</td><td>%llu</td></tr>\n"
-            "      <tr><td style=\"color:#34d399;\">206</td><td>Partial Content (Range)</td><td>%llu</td></tr>\n"
-            "      <tr><td style=\"color:#60a5fa;\">304</td><td>Not Modified (Cache)</td><td>%llu</td></tr>\n"
-            "      <tr><td style=\"color:#fbbf24;\">400</td><td>Bad Request</td><td>%llu</td></tr>\n"
-            "      <tr><td style=\"color:#fbbf24;\">403</td><td>Forbidden</td><td>%llu</td></tr>\n"
-            "      <tr><td style=\"color:#fbbf24;\">404</td><td>Not Found</td><td>%llu</td></tr>\n"
-            "      <tr><td style=\"color:#f87171;\">500</td><td>Internal Error</td><td>%llu</td></tr>\n"
+            "      <tr><td>200</td><td>OK</td><td>%llu</td></tr>\n"
+            "      <tr><td>206</td><td>Partial Content</td><td>%llu</td></tr>\n"
+            "      <tr><td>304</td><td>Not Modified</td><td>%llu</td></tr>\n"
+            "      <tr><td>400</td><td>Bad Request</td><td>%llu</td></tr>\n"
+            "      <tr><td>401</td><td>Unauthorized</td><td>%llu</td></tr>\n"
+            "      <tr><td>403</td><td>Forbidden</td><td>%llu</td></tr>\n"
+            "      <tr><td>404</td><td>Not Found</td><td>%llu</td></tr>\n"
+            "      <tr><td>429</td><td>Too Many Requests</td><td>%llu</td></tr>\n"
+            "      <tr><td>500</td><td>Internal Error</td><td>%llu</td></tr>\n"
             "    </table>\n"
-            "    <p style=\"margin-top:20px; font-size:12px; color:#64748b;\">Format toggle: <a href=\"/server-status?json\">View Raw JSON API</a></p>\n"
+            "    <p style=\"margin-top:20px;\"><a href=\"/server-status?json=1\">View JSON format</a> | <a href=\"/\">Return Home</a></p>\n"
             "  </div>\n"
             "</body>\n"
             "</html>\n",
@@ -115,26 +144,30 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
             srv->stats.active_connections,
             (unsigned long long)srv->stats.total_requests,
             rps,
+            (unsigned long long)rate_blocks,
+            (unsigned long long)host_blocks,
             (unsigned long long)srv->stats.status_200,
             (unsigned long long)srv->stats.status_206,
             (unsigned long long)srv->stats.status_304,
             (unsigned long long)srv->stats.status_400,
+            (unsigned long long)srv->stats.status_401,
             (unsigned long long)srv->stats.status_403,
             (unsigned long long)srv->stats.status_404,
+            (unsigned long long)srv->stats.status_429,
             (unsigned long long)srv->stats.status_500
         );
     }
     
-    char date_buf[64];
-    get_http_date(time(NULL), date_buf, sizeof(date_buf));
-    
     con->http_status = 200;
     srv->stats.status_200++;
     
-    buffer_reset(con->response_headers);
-    chunkqueue_reset(con->write_queue);
+    she_buffer_reset(con->response_headers);
+    she_chunkqueue_reset(con->write_queue);
     
-    buffer_append_printf(con->response_headers,
+    char date_buf[64];
+    get_http_date(now, date_buf, sizeof(date_buf));
+    
+    she_buffer_append_printf(con->response_headers,
         "HTTP/1.1 200 OK\r\n"
         "Date: %s\r\n"
         "Server: %s\r\n"
@@ -145,32 +178,25 @@ static handler_t mod_status_subrequest_start(server_t *srv, connection_t *con, v
         date_buf,
         srv->config.server_tag,
         is_json ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
-        buffer_len(body),
-        con->keep_alive ? "keep-alive" : "close"
-    );
-    
-    chunkqueue_append_buffer(con->write_queue, con->response_headers);
-    if (con->request.method != HTTP_METHOD_HEAD) {
-        chunkqueue_append_buffer(con->write_queue, body);
+        she_buffer_len(body),
+        con->keep_alive ? "keep-alive" : "close");
+        
+    she_chunkqueue_append_buffer(con->write_queue, con->response_headers);
+    if (con->request.method != SHE_HTTP_METHOD_HEAD) {
+        she_chunkqueue_append_buffer(con->write_queue, body);
     }
     
-    buffer_free(body);
-    con->state = CON_STATE_RESPONSE_START;
-    return HANDLER_FINISHED;
+    she_buffer_free(body);
+    con->state = SHE_CON_STATE_RESPONSE_START;
+    return SHE_HANDLER_FINISHED;
 }
 
-static plugin_t g_mod_status = {
-    .version = 1,
-    .name = "mod_status",
-    .description = "Online server runtime metrics and status dashboard (/server-status)",
-    .init = NULL,
-    .cleanup = NULL,
-    .handle_uri_clean = NULL,
-    .handle_subrequest_start = mod_status_subrequest_start,
-    .handle_response_done = NULL,
-    .data = NULL,
-};
-
-plugin_t *mod_status_plugin_init(void) {
-    return &g_mod_status;
+she_plugin_t *mod_status_plugin_init(void) {
+    static she_plugin_t p;
+    memset(&p, 0, sizeof(p));
+    p.version = 1;
+    p.name = "mod_status";
+    p.description = "SHE runtime metrics and online status monitor (/server-status)";
+    p.handle_subrequest_start = mod_status_subrequest_start;
+    return &p;
 }

@@ -1,6 +1,6 @@
 #include "modules/mod_accesslog.h"
-#include "core/server.h"
-#include "core/connection.h"
+#include "core/she_server.h"
+#include "core/she_connection.h"
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
@@ -13,7 +13,7 @@ typedef struct {
 
 static mod_accesslog_data_t g_accesslog_data;
 
-static handler_t mod_accesslog_init(server_t *srv, plugin_t *p) {
+static she_handler_t mod_accesslog_init(she_server_t *srv, she_plugin_t *p) {
     (void)srv;
     (void)mkdir("logs", 0755);
     g_accesslog_data.log_file = fopen("logs/access.log", "a");
@@ -21,10 +21,10 @@ static handler_t mod_accesslog_init(server_t *srv, plugin_t *p) {
         g_accesslog_data.log_file = fopen("access.log", "a");
     }
     p->data = &g_accesslog_data;
-    return HANDLER_GO_ON;
+    return SHE_HANDLER_GO_ON;
 }
 
-static handler_t mod_accesslog_cleanup(server_t *srv, plugin_t *p) {
+static she_handler_t mod_accesslog_cleanup(she_server_t *srv, she_plugin_t *p) {
     (void)srv;
     (void)p;
     if (g_accesslog_data.log_file) {
@@ -32,12 +32,12 @@ static handler_t mod_accesslog_cleanup(server_t *srv, plugin_t *p) {
         fclose(g_accesslog_data.log_file);
         g_accesslog_data.log_file = NULL;
     }
-    return HANDLER_GO_ON;
+    return SHE_HANDLER_GO_ON;
 }
 
-static handler_t mod_accesslog_response_done(server_t *srv, connection_t *con, void *p_data) {
+static she_handler_t mod_accesslog_response_done(she_server_t *srv, she_connection_t *con, void *p_data) {
     mod_accesslog_data_t *d = (mod_accesslog_data_t *)p_data;
-    if (!d || !d->log_file || con->http_status == 0) return HANDLER_GO_ON;
+    if (!d || !d->log_file || con->http_status == 0) return SHE_HANDLER_GO_ON;
     
     time_t now = time(NULL);
     struct tm tm;
@@ -45,14 +45,14 @@ static handler_t mod_accesslog_response_done(server_t *srv, connection_t *con, v
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%d/%b/%Y:%H:%M:%S +0000", &tm);
     
-    const char *method_str = http_method_to_str(con->request.method);
-    const char *uri_raw = buffer_cstr(con->request.uri_raw);
+    const char *method_str = she_http_method_to_str(con->request.method);
+    const char *uri_raw = she_buffer_cstr(con->request.uri_raw);
     if (!uri_raw || !*uri_raw) uri_raw = "/";
     
-    const char *user_agent = http_request_get_header(&con->request, "User-Agent");
+    const char *user_agent = she_http_request_get_header(&con->request, "User-Agent");
     if (!user_agent) user_agent = "-";
     
-    const char *referer = http_request_get_header(&con->request, "Referer");
+    const char *referer = she_http_request_get_header(&con->request, "Referer");
     if (!referer) referer = "-";
     
     /* Standard Apache / Lighttpd Combined Log Format:
@@ -75,21 +75,18 @@ static handler_t mod_accesslog_response_done(server_t *srv, connection_t *con, v
                con->client_ip, method_str, uri_raw, con->http_status, (long long)con->bytes_sent);
     }
     
-    return HANDLER_GO_ON;
+    return SHE_HANDLER_GO_ON;
 }
 
-static plugin_t g_mod_accesslog = {
-    .version = 1,
-    .name = "mod_accesslog",
-    .description = "Combined/Common Log Format access logger to access.log",
-    .init = mod_accesslog_init,
-    .cleanup = mod_accesslog_cleanup,
-    .handle_uri_clean = NULL,
-    .handle_subrequest_start = NULL,
-    .handle_response_done = mod_accesslog_response_done,
-    .data = &g_accesslog_data,
-};
-
-plugin_t *mod_accesslog_plugin_init(void) {
-    return &g_mod_accesslog;
+she_plugin_t *mod_accesslog_plugin_init(void) {
+    static she_plugin_t p;
+    memset(&p, 0, sizeof(p));
+    p.version = 1;
+    p.name = "mod_accesslog";
+    p.description = "Combined/Common Log Format access logger to logs/access.log";
+    p.init = mod_accesslog_init;
+    p.cleanup = mod_accesslog_cleanup;
+    p.handle_response_done = mod_accesslog_response_done;
+    p.data = &g_accesslog_data;
+    return &p;
 }

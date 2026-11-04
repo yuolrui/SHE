@@ -1,6 +1,6 @@
 {
-  "name": "c-lighttpd Web Server Studio",
-  "description": "High-performance Lighttpd-style C Web Server workbench with non-blocking epoll, 10-state FSM, zero-copy sendfile, interactive compiler, and HTTP test suite.",
+  "name": "SHE (Secure HTTP Engine) Studio",
+  "description": "High-performance Secure HTTP Engine in Pure C with Linux epoll, 10-state FSM, token-bucket rate limiting, mod_auth Basic Authentication, virtual hosts, and FastCGI framing.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

@@ -46,7 +46,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-sky-500/30 selection:text-sky-200">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500/30 selection:text-emerald-200">
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -67,19 +67,23 @@ export default function App() {
       <footer className="border-t border-slate-900 bg-slate-950/80 py-6 px-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">c-lighttpd</span>
+            <span className="font-semibold text-emerald-400">SHE</span>
             <span aria-hidden="true">·</span>
-            <span>Modeled on Lighttpd&apos;s Single-Process Event-Driven Architecture</span>
+            <span>Secure HTTP Engine (Pure C with <code className="text-emerald-300 font-mono">she_</code> prefix)</span>
           </div>
 
-          <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-slate-500">
             <span>Linux epoll(7)</span>
             <span aria-hidden="true">·</span>
             <span>sendfile(2) Zero-Copy</span>
             <span aria-hidden="true">·</span>
-            <span>10-State Connection FSM</span>
+            <span>Token-Bucket Rate Limiter</span>
             <span aria-hidden="true">·</span>
-            <span>GCC -O2</span>
+            <span>mod_auth Basic</span>
+            <span aria-hidden="true">·</span>
+            <span>mod_vhost</span>
+            <span aria-hidden="true">·</span>
+            <span>mod_fastcgi</span>
           </div>
         </div>
       </footer>

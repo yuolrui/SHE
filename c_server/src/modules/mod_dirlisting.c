@@ -1,6 +1,6 @@
 #include "modules/mod_dirlisting.h"
-#include "core/server.h"
-#include "core/connection.h"
+#include "core/she_server.h"
+#include "core/she_connection.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,24 +24,29 @@ static void format_size(off_t size, char *buf, size_t max) {
     }
 }
 
-static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *con, void *p_data) {
+static she_handler_t mod_dirlisting_subrequest_start(she_server_t *srv, she_connection_t *con, void *p_data) {
     (void)p_data;
-    const char *uri_path = buffer_cstr(con->request.uri_path);
+    const char *docroot = srv->config.document_root;
+    if (!she_buffer_is_empty(con->request.vhost_docroot)) {
+        docroot = she_buffer_cstr(con->request.vhost_docroot);
+    }
+    
+    const char *uri_path = she_buffer_cstr(con->request.uri_path);
     char full_path[2048];
-    snprintf(full_path, sizeof(full_path), "%s%s", srv->config.document_root, uri_path);
+    snprintf(full_path, sizeof(full_path), "%s%s", docroot, uri_path);
     
     struct stat st;
     if (stat(full_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        return HANDLER_GO_ON;
+        return SHE_HANDLER_GO_ON;
     }
     
     DIR *dir = opendir(full_path);
     if (!dir) {
-        return HANDLER_GO_ON;
+        return SHE_HANDLER_GO_ON;
     }
     
-    buffer_t *body = buffer_init_size(4096);
-    buffer_append_printf(body,
+    she_buffer_t *body = she_buffer_init_size(4096);
+    she_buffer_append_printf(body,
         "<!DOCTYPE html>\n"
         "<html>\n"
         "<head>\n"
@@ -71,9 +76,8 @@ static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *co
         uri_path, uri_path
     );
     
-    /* Parent directory link if not root */
     if (strcmp(uri_path, "/") != 0) {
-        buffer_append_string(body,
+        she_buffer_append_string(body,
             "        <tr><td><a href=\"../\" class=\"dir\">[Parent Directory] ../</a></td><td>-</td><td>-</td></tr>\n"
         );
     }
@@ -105,7 +109,7 @@ static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *co
         localtime_r(&item_st.st_mtime, &tm);
         strftime(date_buf, sizeof(date_buf), "%Y-%m-%d %H:%M", &tm);
         
-        buffer_append_printf(body,
+        she_buffer_append_printf(body,
             "        <tr>"
             "<td><a href=\"%s%s%s\" class=\"%s\">%s%s</a></td>"
             "<td>%s</td>"
@@ -123,13 +127,14 @@ static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *co
     }
     closedir(dir);
     
-    buffer_append_printf(body,
+    she_buffer_append_printf(body,
         "      </tbody>\n"
         "    </table>\n"
-        "    <div class=\"footer\">c-lighttpd/1.0 mod_dirlisting · Directory Auto-Index</div>\n"
+        "    <div class=\"footer\">%s mod_dirlisting · Directory Auto-Index</div>\n"
         "  </div>\n"
         "</body>\n"
-        "</html>\n"
+        "</html>\n",
+        srv->config.server_tag
     );
     
     char cur_date[64];
@@ -138,10 +143,10 @@ static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *co
     con->http_status = 200;
     srv->stats.status_200++;
     
-    buffer_reset(con->response_headers);
-    chunkqueue_reset(con->write_queue);
+    she_buffer_reset(con->response_headers);
+    she_chunkqueue_reset(con->write_queue);
     
-    buffer_append_printf(con->response_headers,
+    she_buffer_append_printf(con->response_headers,
         "HTTP/1.1 200 OK\r\n"
         "Date: %s\r\n"
         "Server: %s\r\n"
@@ -151,32 +156,26 @@ static handler_t mod_dirlisting_subrequest_start(server_t *srv, connection_t *co
         "\r\n",
         cur_date,
         srv->config.server_tag,
-        buffer_len(body),
+        she_buffer_len(body),
         con->keep_alive ? "keep-alive" : "close"
     );
     
-    chunkqueue_append_buffer(con->write_queue, con->response_headers);
-    if (con->request.method != HTTP_METHOD_HEAD) {
-        chunkqueue_append_buffer(con->write_queue, body);
+    she_chunkqueue_append_buffer(con->write_queue, con->response_headers);
+    if (con->request.method != SHE_HTTP_METHOD_HEAD) {
+        she_chunkqueue_append_buffer(con->write_queue, body);
     }
     
-    buffer_free(body);
-    con->state = CON_STATE_RESPONSE_START;
-    return HANDLER_FINISHED;
+    she_buffer_free(body);
+    con->state = SHE_CON_STATE_RESPONSE_START;
+    return SHE_HANDLER_FINISHED;
 }
 
-static plugin_t g_mod_dirlisting = {
-    .version = 1,
-    .name = "mod_dirlisting",
-    .description = "Automatic HTML directory indexing when no index file exists",
-    .init = NULL,
-    .cleanup = NULL,
-    .handle_uri_clean = NULL,
-    .handle_subrequest_start = mod_dirlisting_subrequest_start,
-    .handle_response_done = NULL,
-    .data = NULL,
-};
-
-plugin_t *mod_dirlisting_plugin_init(void) {
-    return &g_mod_dirlisting;
+she_plugin_t *mod_dirlisting_plugin_init(void) {
+    static she_plugin_t p;
+    memset(&p, 0, sizeof(p));
+    p.version = 1;
+    p.name = "mod_dirlisting";
+    p.description = "Automatic HTML directory indexing when no index file exists";
+    p.handle_subrequest_start = mod_dirlisting_subrequest_start;
+    return &p;
 }

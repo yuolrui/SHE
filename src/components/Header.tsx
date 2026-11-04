@@ -1,5 +1,5 @@
 import React from 'react';
-import { Server, Download, RotateCw } from 'lucide-react';
+import { ShieldCheck, Download, RotateCw } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   const navTabs = [
     { id: 'overview', label: 'Architecture' },
     { id: 'code', label: 'Code Explorer' },
-    { id: 'tester', label: 'Live Tester' },
+    { id: 'tester', label: 'Security & Tester' },
     { id: 'plugins', label: 'Modules & Logs' },
     { id: 'benchmark', label: 'Benchmark' },
     { id: 'roadmap', label: 'Roadmap' },
@@ -33,15 +33,20 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-50 flex items-center justify-between gap-8 px-6 py-3.5 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
       {/* Zone 1: Wordmark */}
       <div className="flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
-          <Server className="w-4 h-4" />
+        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <ShieldCheck className="w-4 h-4" />
         </div>
         <div className="flex flex-col">
-          <span className="text-base font-bold tracking-tight text-white whitespace-nowrap">
-            c-lighttpd Studio
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold tracking-tight text-white whitespace-nowrap">
+              SHE
+            </span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-medium">
+              Secure HTTP Engine
+            </span>
+          </div>
           <span className="text-[11px] text-slate-400 font-mono tracking-tight">
-            Pure C · epoll · 10-State FSM · sendfile(2)
+            Pure C · she_ prefix · epoll · 10-State FSM · sendfile(2)
           </span>
         </div>
       </div>
@@ -56,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onTabChange(tab.id)}
               className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                 isActive
-                  ? 'bg-slate-800 text-sky-400 shadow-sm border border-slate-700/60'
+                  ? 'bg-slate-800 text-emerald-400 shadow-sm border border-slate-700/60'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
               }`}
             >
@@ -76,16 +81,16 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onCompile}
           disabled={isCompiling}
-          title="Recompile C project using gcc"
+          title="Recompile SHE C project using gcc"
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-md transition-colors whitespace-nowrap disabled:opacity-50"
         >
-          <RotateCw className={`w-3.5 h-3.5 text-sky-400 ${isCompiling ? 'animate-spin' : ''}`} />
-          <span>{isCompiling ? 'Compiling...' : 'Recompile'}</span>
+          <RotateCw className={`w-3.5 h-3.5 text-emerald-400 ${isCompiling ? 'animate-spin' : ''}`} />
+          <span>{isCompiling ? 'Compiling...' : 'Recompile (she)'}</span>
         </button>
 
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-md shadow-sm transition-colors whitespace-nowrap shrink-0"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-md shadow-sm transition-colors whitespace-nowrap shrink-0"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Download C Code (.tar.gz)</span>
