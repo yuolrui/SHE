@@ -80,17 +80,17 @@ const STATES: StateInfo[] = [
   {
     id: 'HANDLE_REQUEST',
     name: 'SHE_CON_STATE_HANDLE_REQUEST',
-    phase: 'Routing, Auth & Modules',
-    description: 'Executes SHE plugin pipeline: mod_vhost resolves Host header to isolated docroot; mod_auth enforces HTTP Basic Authentication (RFC 7617); mod_fastcgi, mod_status, mod_indexfile, mod_dirlisting run.',
-    lighttpdConcept: 'Modular plugin pipeline returns SHE_HANDLER_FINISHED if intercepted (e.g. 401 Unauthorized or /server-status), or falls through to static zero-copy file serving.',
+    phase: 'Routing, Auth, Compression & Modules',
+    description: 'Executes SHE plugin pipeline: mod_rewrite performs transparent URL rewrites and 301/302 redirects; mod_vhost resolves Host header to isolated docroot; mod_auth enforces HTTP Basic Authentication (RFC 7617); mod_proxy routes upstream gateways; mod_deflate applies on-the-fly RFC 1952 Gzip compression.',
+    lighttpdConcept: 'Modular plugin pipeline returns SHE_HANDLER_FINISHED if intercepted (e.g. 301 redirect, 401 Unauthorized, or /proxy), or falls through to dynamic gzip compression and zero-copy static file serving.',
     cSnippet: `case SHE_CON_STATE_HANDLE_REQUEST: {
-    /* Virtual host routing */
+    /* mod_rewrite transparent rewrite or 301/302 redirect */
+    /* mod_vhost virtual host routing */
     she_plugins_call_handle_uri_clean(srv, con);
-    /* Subrequest hooks (mod_auth, mod_status, mod_fastcgi, etc.) */
+    /* Subrequest hooks (mod_auth, mod_proxy, mod_deflate, mod_status, etc.) */
     she_handler_t hook_res = she_plugins_call_handle_subrequest_start(srv, con);
     if (hook_res == SHE_HANDLER_FINISHED) break;
-    /* Static file lookup & HTTP Range checking */
-    ...
+    /* Static file lookup, mod_deflate gzip check & HTTP Range */
     con->state = SHE_CON_STATE_RESPONSE_START;
     break;
 }`,

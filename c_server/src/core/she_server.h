@@ -31,6 +31,23 @@ typedef struct {
     /* Vhost settings */
     int vhost_enabled;
     char vhost_map[512];    /* e.g. "api.local:./www/api,docs.local:./www/docs" */
+    
+    /* Phase 4: Deflate / Compression settings */
+    int deflate_enabled;
+    int deflate_min_size;
+    
+    /* Phase 4: Rewrite & Redirect settings */
+    int rewrite_enabled;
+    char rewrite_rules[512];    /* e.g. "/old-docs=>/docs/,/api/ping=>/api/index.html" */
+    char redirect_rules[512];   /* e.g. "/legacy=>301:/index.html,/guide=>302:/docs/" */
+    
+    /* Phase 4: Reverse Proxy settings */
+    int proxy_enabled;
+    char proxy_path[128];       /* e.g. "/proxy" or "/upstream" */
+    char proxy_backend[128];    /* e.g. "127.0.0.1:3000" */
+    
+    /* Phase 4: Multi-Worker Process Model */
+    int workers;                /* default: 1 */
 } she_server_config_t;
 
 typedef struct {
@@ -44,6 +61,8 @@ typedef struct {
     /* HTTP response code counters */
     uint64_t status_200;
     uint64_t status_206;
+    uint64_t status_301;
+    uint64_t status_302;
     uint64_t status_304;
     uint64_t status_400;
     uint64_t status_401;
@@ -52,6 +71,11 @@ typedef struct {
     uint64_t status_405;
     uint64_t status_429;
     uint64_t status_500;
+    
+    /* Phase 4 metrics */
+    uint64_t requests_compressed;
+    uint64_t bytes_compressed_saved;
+    uint64_t requests_proxied;
 } she_server_stats_t;
 
 struct she_server {

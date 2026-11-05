@@ -3,6 +3,7 @@
 #include "http/she_mime.h"
 #include "net/she_net.h"
 #include "modules/she_plugin.h"
+#include "modules/mod_deflate.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -140,7 +141,7 @@ static time_t she_parse_http_date(const char *str) {
     return 0;
 }
 
-static void she_generate_error_response(she_server_t *srv, she_connection_t *con, int status) {
+void she_generate_error_response(she_server_t *srv, she_connection_t *con, int status) {
     con->http_status = status;
     she_buffer_reset(con->response_headers);
     she_chunkqueue_reset(con->write_queue);
@@ -468,6 +469,67 @@ int she_connection_state_machine(she_server_t *srv, she_connection_t *con) {
                 she_get_http_date(time(NULL), cur_date, sizeof(cur_date));
                 she_get_http_date(st.st_mtime, mod_date, sizeof(mod_date));
                 const char *mime = she_mime_type_get(full_path);
+                
+                /* Phase 4: Dynamic Gzip Compression (mod_deflate) */
+                const char *accept_encoding = she_http_request_get_header(&con->request, "Accept-Encoding");
+                int client_supports_gzip = (accept_encoding && strstr(accept_encoding, "gzip") != NULL);
+                int is_compressible = (srv->config.deflate_enabled && she_deflate_is_compressible_mime(mime));
+                int min_size = srv->config.deflate_min_size > 0 ? srv->config.deflate_min_size : 128;
+                int should_compress = (!is_range && client_supports_gzip && is_compressible && 
+                                       file_size >= min_size && file_size <= 8 * 1024 * 1024);
+                
+                if (should_compress) {
+                    char *raw_buf = (char *)malloc((size_t)file_size);
+                    if (raw_buf) {
+                        ssize_t rd = pread(file_fd, raw_buf, (size_t)file_size, 0);
+                        close(file_fd);
+                        file_fd = -1;
+                        if (rd == file_size) {
+                            char *gz_data = NULL;
+                            size_t gz_len = 0;
+                            if (she_deflate_compress_gzip(raw_buf, (size_t)file_size, &gz_data, &gz_len) == 0 && gz_len < (size_t)file_size) {
+                                free(raw_buf);
+                                srv->stats.requests_compressed++;
+                                srv->stats.bytes_compressed_saved += (file_size - gz_len);
+                                
+                                she_buffer_append_printf(con->response_headers,
+                                    "HTTP/1.1 200 OK\r\n"
+                                    "Date: %s\r\n"
+                                    "Server: %s\r\n"
+                                    "Content-Type: %s\r\n"
+                                    "Content-Encoding: gzip\r\n"
+                                    "Vary: Accept-Encoding\r\n"
+                                    "Content-Length: %zu\r\n"
+                                    "Last-Modified: %s\r\n"
+                                    "Accept-Ranges: bytes\r\n",
+                                    cur_date,
+                                    srv->config.server_tag,
+                                    mime,
+                                    gz_len,
+                                    mod_date);
+                                    
+                                if (srv->security) {
+                                    she_security_append_headers(srv->security, con);
+                                }
+                                
+                                she_buffer_append_printf(con->response_headers,
+                                    "Connection: %s\r\n\r\n",
+                                    con->keep_alive ? "keep-alive" : "close");
+                                    
+                                she_chunkqueue_append_buffer(con->write_queue, con->response_headers);
+                                if (con->request.method != SHE_HTTP_METHOD_HEAD) {
+                                    she_chunkqueue_append_mem(con->write_queue, gz_data, gz_len);
+                                }
+                                free(gz_data);
+                                con->state = SHE_CON_STATE_RESPONSE_START;
+                                break;
+                            }
+                            if (gz_data) free(gz_data);
+                        }
+                        free(raw_buf);
+                        file_fd = open(full_path, O_RDONLY);
+                    }
+                }
                 
                 if (is_range) {
                     she_buffer_append_printf(con->response_headers,

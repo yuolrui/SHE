@@ -79,27 +79,69 @@ int she_config_load_file(she_server_config_t *cfg, const char *filepath);`,
   },
   {
     phase: 'Phase 4',
-    title: 'TLS 1.3 Termination, Compression & HTTP/2',
-    status: 'planned',
-    description: 'Enterprise deployment capabilities including TLS termination, on-the-fly streaming compression, and HTTP/2 multiplexing.',
+    title: 'Dynamic Compression, URL Rewriting & Reverse Proxy',
+    status: 'completed',
+    description: 'Enterprise edge routing & bandwidth optimization: RFC 1952 dynamic Gzip compression with zlib, transparent URL rewriting and 301/302 redirects, Reverse Proxy Gateway with X-Forwarded-* headers, and multi-worker SO_REUSEPORT socket balancing.',
     features: [
-      'mod_openssl: TLS 1.3 / 1.2 termination using OpenSSL or mbedTLS with ALPN',
-      'mod_compress: dynamic on-the-fly chunked Gzip & Brotli HTTP transfer encoding',
-      'mod_rewrite / mod_redirect: regex-based URI routing and 301/302 rewrites',
-      'Multi-worker process model with SO_REUSEPORT kernel load balancing',
-      'HTTP/2 binary framing and HPACK header compression engine',
+      'mod_deflate: On-the-fly RFC 1952 Gzip compression via zlib with Content-Encoding: gzip',
+      'mod_rewrite: URL rewriting and HTTP 301/302 redirection with Location header injection',
+      'mod_proxy: Reverse Proxy Gateway forwarding X-Forwarded-For, X-Forwarded-Host, and X-Forwarded-Proto',
+      'Multi-worker process model with Linux kernel SO_REUSEPORT socket load balancing (-w <workers>)',
+      'she.conf runtime configuration directives for deflate, rewrite, redirect, and proxy',
+      'Telemetry tracking for requests_compressed, bytes_compressed_saved, and requests_proxied',
     ],
-    codeHighlight: `/* Phase 4 Blueprint: TLS Socket Abstraction */
+    codeHighlight: `/* Verified & Active in Phase 4 */
+int she_deflate_compress_gzip(const char *in_data, size_t in_len, char **out_data, size_t *out_len);
+she_plugin_t *mod_deflate_plugin_init(void);
+she_plugin_t *mod_rewrite_plugin_init(void);
+she_plugin_t *mod_proxy_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 5',
+    title: 'TLS 1.3 Termination, WebSocket Protocol & HTTP/2 Multiplexing',
+    status: 'completed',
+    description: 'Next generation transport security and protocol modernization: Native OpenSSL 3.0 TLS 1.3 / 1.2 termination with ALPN negotiation ("h2", "http/1.1"), RFC 6455 WebSocket handshake engine with SHA-1 + Base64 accept computation, and RFC 9113 HTTP/2 24-byte preface verification and 9-byte binary frame header multiplexer.',
+    features: [
+      'RFC 6455 WebSocket Handshake Engine with SHA-1 + Base64 Sec-WebSocket-Accept computation',
+      'WebSocket 101 Switching Protocols upgrade handler & runtime opcode telemetry (/ws)',
+      'OpenSSL 3.0 TLS 1.3 / 1.2 Transport Security Context (SSL_CTX) & modern ciphersuites',
+      'TLS ALPN (Application-Layer Protocol Negotiation) callback advertising "h2" and "http/1.1"',
+      'RFC 9113 HTTP/2 24-byte client connection preface verification (PRI * HTTP/2.0...)',
+      'HTTP/2 9-byte binary frame header engine (she_h2_frame_header_t) & SETTINGS negotiation',
+      'Modular configuration directives in she.conf for websocket, ssl, and http2',
+      'Live endpoints: /ws (handshake/telemetry), /ssl-status, and /h2-status',
+    ],
+    codeHighlight: `/* Verified & Active in Phase 5 */
+int she_websocket_compute_accept(const char *client_key, char *out_accept, size_t out_len);
+she_plugin_t *mod_websocket_plugin_init(void);
+she_plugin_t *mod_ssl_plugin_init(void);
+she_plugin_t *mod_http2_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 6',
+    title: 'WASM Edge Function Execution & eBPF Kernel Acceleration',
+    status: 'planned',
+    description: 'Enterprise serverless computing and kernel-level performance: Embedded WebAssembly (WasmEdge/WAMR) runtime for dynamic edge microservices, and eBPF/XDP socket filtering for DDoS mitigation and kernel-bypass packet routing.',
+    features: [
+      'WasmEdge / WAMR embedded WebAssembly runtime for serverless edge handlers',
+      'Dynamic WASM module hot-reloading with isolated memory sandboxing',
+      'eBPF / XDP accelerated packet steering and kernel-bypass zero-copy',
+      'Automated ACME / Let\'s Encrypt certificate renewal engine',
+      'Full HTTP/2 HPACK dynamic table compression & multi-stream multiplexing',
+      'QUIC / HTTP/3 UDP transport protocol foundation',
+    ],
+    codeHighlight: `/* Phase 6 Blueprint: WASM Edge & eBPF Steering */
 typedef struct {
-    int (*read)(she_connection_t *con, void *buf, size_t count);
-    int (*write)(she_connection_t *con, const void *buf, size_t count);
-    void *ssl_handle;
-} she_network_backend_t;`,
+    void *wasm_engine;
+    void *wasm_module;
+    int (*invoke_handler)(const char *uri, const char *req, char **resp);
+} she_wasm_runtime_t;
+int she_ebpf_attach_xdp_filter(int ifindex, const char *bpf_obj);`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[2]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[4]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -110,7 +152,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1, 2, and 3 Completed</span>
+          <span>Phase 1, 2, 3, 4, and 5 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -118,12 +160,12 @@ export const RoadmapView: React.FC = () => {
         <p className="text-xs text-slate-300 leading-relaxed max-w-3xl mt-1">
           Evolution from a bare single-process epoll loop into a fully-featured, secure HTTP engine with standard{' '}
           <code className="text-emerald-300 font-mono">she_</code> prefix keywords, token-bucket rate limiting,
-          RFC 7617 Basic Authentication, virtual hosting, and FastCGI protocol framing.
+          RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, and RFC 9113 HTTP/2.
         </p>
       </div>
 
       {/* Milestones list */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         {MILESTONES.map((m) => {
           const isSelected = selectedMilestone.phase === m.phase;
           const isCompleted = m.status === 'completed';

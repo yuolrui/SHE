@@ -99,6 +99,7 @@ void she_connection_reset(she_connection_t *con);
 const char *she_connection_state_to_str(she_con_state_t state);
 int she_connection_state_machine(she_server_t *srv, she_connection_t *con);
 void she_connection_handle_fdevent(void *context, int revents);
+void she_generate_error_response(she_server_t *srv, she_connection_t *con, int status);
 
 /* Compatibility macros */
 #define connection_init she_connection_init

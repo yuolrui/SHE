@@ -76,6 +76,24 @@ int she_config_load_file(she_server_config_t *cfg, const char *filepath) {
             cfg->vhost_enabled = atoi(val);
         } else if (strcmp(key, "vhost.map") == 0) {
             strncpy(cfg->vhost_map, val, sizeof(cfg->vhost_map) - 1);
+        } else if (strcmp(key, "server.workers") == 0) {
+            cfg->workers = atoi(val);
+        } else if (strcmp(key, "deflate.enable") == 0) {
+            cfg->deflate_enabled = atoi(val);
+        } else if (strcmp(key, "deflate.min-size") == 0) {
+            cfg->deflate_min_size = atoi(val);
+        } else if (strcmp(key, "rewrite.enable") == 0) {
+            cfg->rewrite_enabled = atoi(val);
+        } else if (strcmp(key, "rewrite.rules") == 0 || strcmp(key, "rewrite.rule") == 0) {
+            strncpy(cfg->rewrite_rules, val, sizeof(cfg->rewrite_rules) - 1);
+        } else if (strcmp(key, "redirect.rules") == 0 || strcmp(key, "redirect.rule") == 0) {
+            strncpy(cfg->redirect_rules, val, sizeof(cfg->redirect_rules) - 1);
+        } else if (strcmp(key, "proxy.enable") == 0) {
+            cfg->proxy_enabled = atoi(val);
+        } else if (strcmp(key, "proxy.path") == 0) {
+            strncpy(cfg->proxy_path, val, sizeof(cfg->proxy_path) - 1);
+        } else if (strcmp(key, "proxy.backend") == 0) {
+            strncpy(cfg->proxy_backend, val, sizeof(cfg->proxy_backend) - 1);
         }
     }
     

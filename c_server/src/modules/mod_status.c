@@ -49,9 +49,19 @@ static she_handler_t mod_status_subrequest_start(she_server_t *srv, she_connecti
             "    \"host_header_rejections\": %llu,\n"
             "    \"headers_injected\": %d\n"
             "  },\n"
+            "  \"phase4\": {\n"
+            "    \"deflate_active\": %d,\n"
+            "    \"requests_compressed\": %llu,\n"
+            "    \"bytes_saved\": %llu,\n"
+            "    \"requests_proxied\": %llu,\n"
+            "    \"redirects_301\": %llu,\n"
+            "    \"redirects_302\": %llu\n"
+            "  },\n"
             "  \"status_codes\": {\n"
             "    \"200\": %llu,\n"
             "    \"206\": %llu,\n"
+            "    \"301\": %llu,\n"
+            "    \"302\": %llu,\n"
             "    \"304\": %llu,\n"
             "    \"400\": %llu,\n"
             "    \"401\": %llu,\n"
@@ -74,8 +84,16 @@ static she_handler_t mod_status_subrequest_start(she_server_t *srv, she_connecti
             (unsigned long long)rate_blocks,
             (unsigned long long)host_blocks,
             srv->security && srv->security->config.enable_security_headers ? 1 : 0,
+            srv->config.deflate_enabled ? 1 : 0,
+            (unsigned long long)srv->stats.requests_compressed,
+            (unsigned long long)srv->stats.bytes_compressed_saved,
+            (unsigned long long)srv->stats.requests_proxied,
+            (unsigned long long)srv->stats.status_301,
+            (unsigned long long)srv->stats.status_302,
             (unsigned long long)srv->stats.status_200,
             (unsigned long long)srv->stats.status_206,
+            (unsigned long long)srv->stats.status_301,
+            (unsigned long long)srv->stats.status_302,
             (unsigned long long)srv->stats.status_304,
             (unsigned long long)srv->stats.status_400,
             (unsigned long long)srv->stats.status_401,

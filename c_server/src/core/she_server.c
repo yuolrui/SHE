@@ -8,6 +8,12 @@
 #include "modules/mod_auth.h"
 #include "modules/mod_vhost.h"
 #include "modules/mod_fastcgi.h"
+#include "modules/mod_rewrite.h"
+#include "modules/mod_deflate.h"
+#include "modules/mod_proxy.h"
+#include "modules/mod_websocket.h"
+#include "modules/mod_ssl.h"
+#include "modules/mod_http2.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -110,8 +116,14 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     
     /* Initialize and register SHE modular plugin pipeline */
     she_plugins_init(srv);
+    she_plugins_register(srv, mod_rewrite_plugin_init());
     she_plugins_register(srv, mod_vhost_plugin_init());
     she_plugins_register(srv, mod_auth_plugin_init());
+    she_plugins_register(srv, mod_ssl_plugin_init());
+    she_plugins_register(srv, mod_http2_plugin_init());
+    she_plugins_register(srv, mod_websocket_plugin_init());
+    she_plugins_register(srv, mod_proxy_plugin_init());
+    she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
     she_plugins_register(srv, mod_fastcgi_plugin_init());
     she_plugins_register(srv, mod_indexfile_plugin_init());

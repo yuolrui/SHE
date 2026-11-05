@@ -24,6 +24,7 @@ static void print_usage(const char *prog) {
     printf("  -p <port>         Listen port (default: 8899)\n");
     printf("  -b <ip>           Bind IP address (default: 0.0.0.0)\n");
     printf("  -d <dir>          Document root directory (default: ./www)\n");
+    printf("  -w <workers>      Worker process count with SO_REUSEPORT (default: 1)\n");
     printf("  -k <seconds>      Keep-alive timeout in seconds (default: 15)\n");
     printf("  -m <connections>  Max simultaneous connections (default: 1024)\n");
     printf("  -v                Verbose mode\n");
@@ -42,6 +43,7 @@ int main(int argc, char *argv[]) {
     config.max_keepalive_requests = 100;
     strcpy(config.server_tag, "SHE/1.0 (Secure HTTP Engine)");
     config.verbose = 1;
+    config.workers = 1;
     
     config.security_cfg.enable_rate_limit = 1;
     config.security_cfg.rate_limit_rps = 40.0;
@@ -58,18 +60,29 @@ int main(int argc, char *argv[]) {
     config.vhost_enabled = 1;
     strcpy(config.vhost_map, "docs.local:./www/docs,api.local:./www/api,secure.local:./www/secure");
     
+    /* Phase 4 defaults */
+    config.deflate_enabled = 1;
+    config.deflate_min_size = 128;
+    config.rewrite_enabled = 1;
+    strcpy(config.rewrite_rules, "/old-docs=>/docs/index.html");
+    strcpy(config.redirect_rules, "/legacy=>301:/index.html,/guide=>302:/docs/");
+    config.proxy_enabled = 1;
+    strcpy(config.proxy_path, "/proxy");
+    strcpy(config.proxy_backend, "127.0.0.1:3000");
+    
     /* Auto-load she.conf if present */
     if (access("she.conf", R_OK) == 0) {
         she_config_load_file(&config, "she.conf");
     }
     
     int opt;
-    while ((opt = getopt(argc, argv, "c:p:b:d:k:m:vh")) != -1) {
+    while ((opt = getopt(argc, argv, "c:p:b:d:w:k:m:vh")) != -1) {
         switch (opt) {
             case 'c': she_config_load_file(&config, optarg); break;
             case 'p': config.port = atoi(optarg); break;
             case 'b': strncpy(config.bind_ip, optarg, sizeof(config.bind_ip) - 1); break;
             case 'd': strncpy(config.document_root, optarg, sizeof(config.document_root) - 1); break;
+            case 'w': config.workers = atoi(optarg); break;
             case 'k': config.keepalive_timeout_sec = atoi(optarg); break;
             case 'm': config.max_connections = atoi(optarg); break;
             case 'v': config.verbose = 1; break;
@@ -94,6 +107,7 @@ int main(int argc, char *argv[]) {
     printf(" Port:            %d\n", config.port);
     printf(" Bind Address:    %s\n", config.bind_ip);
     printf(" Document Root:   %s\n", config.document_root);
+    printf(" Workers:         %d (SO_REUSEPORT socket balancing)\n", config.workers > 0 ? config.workers : 1);
     printf(" Max Connections: %d\n", config.max_connections);
     printf(" Keep-Alive:      %d s (max %d reqs/con)\n", 
            config.keepalive_timeout_sec, config.max_keepalive_requests);
@@ -103,6 +117,9 @@ int main(int argc, char *argv[]) {
     printf(" Basic Auth:      Active (%s, default admin:she_secret123)\n", config.auth_path);
     printf(" Virtual Hosts:   Active (docs.local, api.local, secure.local)\n");
     printf(" FastCGI Gateway: Active (/fastcgi, FastCGI 1.0 upstream client)\n");
+    printf(" Gzip Deflate:    Active (RFC 1952 dynamic compression via zlib)\n");
+    printf(" URL Rewrite:     Active (/old-docs => /docs/index.html, /legacy => 301)\n");
+    printf(" Reverse Proxy:   Active (/proxy, Upstream X-Forwarded-* headers)\n");
     printf(" I/O Model:       Non-blocking epoll + Zero-copy sendfile\n");
     printf(" State Machine:   Lighttpd 10-state non-blocking FSM\n");
     printf("=====================================================\n");
