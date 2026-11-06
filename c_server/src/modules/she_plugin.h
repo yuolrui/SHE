@@ -37,7 +37,7 @@ struct she_plugin {
     void *data;
 };
 
-#define SHE_MAX_PLUGINS 16
+#define SHE_MAX_PLUGINS 32
 
 typedef struct {
     she_plugin_t *plugins[SHE_MAX_PLUGINS];

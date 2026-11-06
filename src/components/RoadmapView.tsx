@@ -120,28 +120,51 @@ she_plugin_t *mod_http2_plugin_init(void);`,
   {
     phase: 'Phase 6',
     title: 'WASM Edge Function Execution & eBPF Kernel Acceleration',
-    status: 'planned',
-    description: 'Enterprise serverless computing and kernel-level performance: Embedded WebAssembly (WasmEdge/WAMR) runtime for dynamic edge microservices, and eBPF/XDP socket filtering for DDoS mitigation and kernel-bypass packet routing.',
+    status: 'completed',
+    description: 'Enterprise serverless computing, kernel-level packet filtering and automated PKI: Embedded WebAssembly (WASM 1.0) sandbox runtime for dynamic edge microservices, eBPF/XDP socket filtering for DDoS mitigation with in-kernel BPF maps, and RFC 8555 ACME automated Let\'s Encrypt certificate management.',
     features: [
-      'WasmEdge / WAMR embedded WebAssembly runtime for serverless edge handlers',
-      'Dynamic WASM module hot-reloading with isolated memory sandboxing',
-      'eBPF / XDP accelerated packet steering and kernel-bypass zero-copy',
-      'Automated ACME / Let\'s Encrypt certificate renewal engine',
-      'Full HTTP/2 HPACK dynamic table compression & multi-stream multiplexing',
-      'QUIC / HTTP/3 UDP transport protocol foundation',
+      'mod_wasm: WebAssembly 1.0 embedded sandbox runtime for serverless edge handlers',
+      'Edge function microservices: edge_hash, edge_fibonacci, edge_auth_check, edge_filter',
+      'Isolated 64KB linear memory page sandboxing with microsecond execution latency',
+      'mod_ebpf: Linux eBPF / XDP in-kernel network driver packet filter & DDoS shield',
+      'Dynamic kernel BPF hash maps for real-time attacker IP blacklisting & SYN flood defense',
+      'mod_acme: RFC 8555 ACME automated certificate management (Let\'s Encrypt / ZeroSSL)',
+      'Automated http-01 challenge responder (/.well-known/acme-challenge/) & auto-renewal',
+      'Interactive telemetry endpoints: /wasm-status, /ebpf-status, /acme-status, and /edge/invoke',
     ],
-    codeHighlight: `/* Phase 6 Blueprint: WASM Edge & eBPF Steering */
+    codeHighlight: `/* Verified & Active in Phase 6 */
+int she_wasm_execute_function(const char *func_name, const char *arg, char *out_buf, size_t out_max, uint64_t *out_duration_us);
+int she_ebpf_inspect_packet(const char *src_ip, uint16_t src_port, int is_syn);
+int she_acme_set_http01_challenge(const char *token, const char *key_auth, const char *domain);
+she_plugin_t *mod_wasm_plugin_init(void);
+she_plugin_t *mod_ebpf_plugin_init(void);
+she_plugin_t *mod_acme_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 7',
+    title: 'QUIC / HTTP/3 UDP Engine & Zero-Trust WireGuard Mesh',
+    status: 'planned',
+    description: 'Next-generation UDP transport and zero-trust mesh networking: Native epoll UDP listener with recvmmsg(2) batching, RFC 9000 QUIC packet framing with connection migration, QPACK dynamic header compression, and embedded WireGuard noise protocol VPN mesh tunnel.',
+    features: [
+      'Native Linux epoll UDP socket engine with recvmmsg(2) kernel batch I/O',
+      'RFC 9000 QUIC transport protocol layer with connection ID routing',
+      'RFC 9204 QPACK dynamic & static table header compression',
+      'Zero-RTT connection resumption with TLS 1.3 0-RTT early data',
+      'Embedded WireGuard Noise Protocol zero-trust site-to-site mesh overlay',
+      'UDP connection migration resilience across network interface changes',
+    ],
+    codeHighlight: `/* Phase 7 Blueprint: QUIC & UDP Batch Engine */
 typedef struct {
-    void *wasm_engine;
-    void *wasm_module;
-    int (*invoke_handler)(const char *uri, const char *req, char **resp);
-} she_wasm_runtime_t;
-int she_ebpf_attach_xdp_filter(int ifindex, const char *bpf_obj);`,
+    int udp_fd;
+    uint64_t connection_id;
+    int (*quic_recv_packet)(she_connection_t *con, struct mmsghdr *msgs, unsigned int vlen);
+    int (*qpack_decode_header)(she_connection_t *con, const uint8_t *in, size_t in_len);
+} she_quic_engine_t;`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[4]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[5]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -152,20 +175,21 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1, 2, 3, 4, and 5 Completed</span>
+          <span>Phase 1, 2, 3, 4, 5, and 6 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
         </h2>
         <p className="text-xs text-slate-300 leading-relaxed max-w-3xl mt-1">
-          Evolution from a bare single-process epoll loop into a fully-featured, secure HTTP engine with standard{' '}
+          Evolution from a bare single-process epoll loop into an enterprise secure HTTP engine with standard{' '}
           <code className="text-emerald-300 font-mono">she_</code> prefix keywords, token-bucket rate limiting,
-          RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, and RFC 9113 HTTP/2.
+          RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, RFC 9113 HTTP/2,
+          WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, and RFC 8555 ACME automated certificates.
         </p>
       </div>
 
       {/* Milestones list */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5">
         {MILESTONES.map((m) => {
           const isSelected = selectedMilestone.phase === m.phase;
           const isCompleted = m.status === 'completed';

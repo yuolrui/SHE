@@ -14,6 +14,9 @@
 #include "modules/mod_websocket.h"
 #include "modules/mod_ssl.h"
 #include "modules/mod_http2.h"
+#include "modules/mod_wasm.h"
+#include "modules/mod_ebpf.h"
+#include "modules/mod_acme.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -122,6 +125,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_ssl_plugin_init());
     she_plugins_register(srv, mod_http2_plugin_init());
     she_plugins_register(srv, mod_websocket_plugin_init());
+    she_plugins_register(srv, mod_wasm_plugin_init());
+    she_plugins_register(srv, mod_ebpf_plugin_init());
+    she_plugins_register(srv, mod_acme_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());

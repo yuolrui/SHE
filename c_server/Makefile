@@ -13,7 +13,7 @@ EVENT_SRCS    = src/event/she_fdevent.c
 NET_SRCS      = src/net/she_net.c
 HTTP_SRCS     = src/http/she_http_parser.c src/http/she_mime.c
 SECURITY_SRCS = src/security/she_security.c
-MODULE_SRCS   = src/modules/she_plugin.c src/modules/mod_status.c src/modules/mod_indexfile.c src/modules/mod_dirlisting.c src/modules/mod_accesslog.c src/modules/mod_auth.c src/modules/mod_vhost.c src/modules/mod_fastcgi.c src/modules/mod_deflate.c src/modules/mod_rewrite.c src/modules/mod_proxy.c src/modules/mod_websocket.c src/modules/mod_ssl.c src/modules/mod_http2.c
+MODULE_SRCS   = src/modules/she_plugin.c src/modules/mod_status.c src/modules/mod_indexfile.c src/modules/mod_dirlisting.c src/modules/mod_accesslog.c src/modules/mod_auth.c src/modules/mod_vhost.c src/modules/mod_fastcgi.c src/modules/mod_deflate.c src/modules/mod_rewrite.c src/modules/mod_proxy.c src/modules/mod_websocket.c src/modules/mod_ssl.c src/modules/mod_http2.c src/modules/mod_wasm.c src/modules/mod_ebpf.c src/modules/mod_acme.c
 MAIN_SRC      = src/main.c
 
 SRCS = $(CORE_SRCS) $(EVENT_SRCS) $(NET_SRCS) $(HTTP_SRCS) $(SECURITY_SRCS) $(MODULE_SRCS) $(MAIN_SRC)
