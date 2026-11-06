@@ -143,28 +143,51 @@ she_plugin_t *mod_acme_plugin_init(void);`,
   {
     phase: 'Phase 7',
     title: 'QUIC / HTTP/3 UDP Engine & Zero-Trust WireGuard Mesh',
-    status: 'planned',
-    description: 'Next-generation UDP transport and zero-trust mesh networking: Native epoll UDP listener with recvmmsg(2) batching, RFC 9000 QUIC packet framing with connection migration, QPACK dynamic header compression, and embedded WireGuard noise protocol VPN mesh tunnel.',
+    status: 'completed',
+    description: 'Next-generation UDP transport, zero-trust mesh networking and gRPC binary transcoding: Native RFC 9000 QUIC v1 packet framing with connection migration, RFC 9114 HTTP/3 bidirectional streaming, RFC 9204 QPACK compression, Noise_IKpsk2 WireGuard cryptokey routing mesh (she-wg0), and gRPC 5-byte length-prefixed binary protobuf gateway.',
     features: [
-      'Native Linux epoll UDP socket engine with recvmmsg(2) kernel batch I/O',
-      'RFC 9000 QUIC transport protocol layer with connection ID routing',
-      'RFC 9204 QPACK dynamic & static table header compression',
-      'Zero-RTT connection resumption with TLS 1.3 0-RTT early data',
-      'Embedded WireGuard Noise Protocol zero-trust site-to-site mesh overlay',
-      'UDP connection migration resilience across network interface changes',
+      'mod_quic: RFC 9000 QUIC v1 & RFC 9114 HTTP/3 bidirectional streaming engine',
+      'RFC 9204 QPACK dynamic & static table header compression (4096-byte table)',
+      'Alt-Svc header injection advertising h3 and h3-29 UDP endpoints',
+      'mod_wireguard: Zero-Trust Noise_IKpsk2 VPN tunnel & in-kernel cryptokey routing',
+      'Interface she-wg0 with dynamic peer management API (/wireguard/peers)',
+      'mod_grpc: gRPC over HTTP/2 binary gateway with 5-byte length-prefixed framing',
+      'JSON-to-Protobuf dynamic transcoder (/grpc/transcode) and status telemetry',
+      'Interactive endpoints: /quic-status, /h3-test, /wireguard-status, /grpc-status',
     ],
-    codeHighlight: `/* Phase 7 Blueprint: QUIC & UDP Batch Engine */
+    codeHighlight: `/* Verified & Active in Phase 7 */
+int she_quic_parse_header(const uint8_t *buf, size_t len, she_quic_header_t *out_hdr);
+int she_wireguard_add_peer(const char *name, const char *pubkey, const char *endpoint, const char *allowed_ips);
+int she_grpc_pack_frame(const uint8_t *msg, uint32_t len, uint8_t compressed, uint8_t *out_frame, size_t out_max);
+she_plugin_t *mod_quic_plugin_init(void);
+she_plugin_t *mod_wireguard_plugin_init(void);
+she_plugin_t *mod_grpc_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 8',
+    title: 'Multi-Tenant AI Gateway, LLM Streaming Proxy & Distributed Cluster Sync',
+    status: 'planned',
+    description: 'Cloud-native AI Gateway and distributed edge infrastructure: Server-Sent Events (SSE) non-blocking chunked streaming engine for LLM tokens, multi-tenant quota isolation, Raft consensus distributed cluster state synchronization, dynamic TLS certificate hot-swapping without restart, and OpenTelemetry W3C distributed tracing.',
+    features: [
+      'Server-Sent Events (SSE) non-blocking chunked streaming engine for LLM tokens',
+      'Multi-tenant tenant ID isolation with dynamic token quota rate-limiting',
+      'Raft consensus distributed cluster state synchronization',
+      'Dynamic TLS certificate hot-swapping without process restart',
+      'OpenTelemetry distributed tracing and W3C tracecontext propagation',
+      'DPDK kernel-bypass 100GbE line-rate packet processing',
+    ],
+    codeHighlight: `/* Phase 8 Blueprint: AI Gateway & Raft Cluster */
 typedef struct {
-    int udp_fd;
-    uint64_t connection_id;
-    int (*quic_recv_packet)(she_connection_t *con, struct mmsghdr *msgs, unsigned int vlen);
-    int (*qpack_decode_header)(she_connection_t *con, const uint8_t *in, size_t in_len);
-} she_quic_engine_t;`,
+    char tenant_id[64];
+    uint64_t token_quota;
+    int (*stream_tokens)(she_connection_t *con, const char *chunk);
+    int (*raft_replicate_state)(she_server_t *srv, const void *log_entry);
+} she_ai_gateway_t;`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[5]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[6]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -175,7 +198,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1, 2, 3, 4, 5, and 6 Completed</span>
+          <span>Phase 1, 2, 3, 4, 5, 6, and 7 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -184,12 +207,12 @@ export const RoadmapView: React.FC = () => {
           Evolution from a bare single-process epoll loop into an enterprise secure HTTP engine with standard{' '}
           <code className="text-emerald-300 font-mono">she_</code> prefix keywords, token-bucket rate limiting,
           RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, RFC 9113 HTTP/2,
-          WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, and RFC 8555 ACME automated certificates.
+          WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, and gRPC Protobuf Transcoding.
         </p>
       </div>
 
       {/* Milestones list */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
         {MILESTONES.map((m) => {
           const isSelected = selectedMilestone.phase === m.phase;
           const isCompleted = m.status === 'completed';

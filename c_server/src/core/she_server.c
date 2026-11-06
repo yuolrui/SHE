@@ -17,6 +17,9 @@
 #include "modules/mod_wasm.h"
 #include "modules/mod_ebpf.h"
 #include "modules/mod_acme.h"
+#include "modules/mod_quic.h"
+#include "modules/mod_wireguard.h"
+#include "modules/mod_grpc.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -128,6 +131,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_wasm_plugin_init());
     she_plugins_register(srv, mod_ebpf_plugin_init());
     she_plugins_register(srv, mod_acme_plugin_init());
+    she_plugins_register(srv, mod_quic_plugin_init());
+    she_plugins_register(srv, mod_wireguard_plugin_init());
+    she_plugins_register(srv, mod_grpc_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
