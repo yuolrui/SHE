@@ -165,29 +165,47 @@ she_plugin_t *mod_grpc_plugin_init(void);`,
   },
   {
     phase: 'Phase 8',
-    title: 'Multi-Tenant AI Gateway, LLM Streaming Proxy & Distributed Cluster Sync',
-    status: 'planned',
-    description: 'Cloud-native AI Gateway and distributed edge infrastructure: Server-Sent Events (SSE) non-blocking chunked streaming engine for LLM tokens, multi-tenant quota isolation, Raft consensus distributed cluster state synchronization, dynamic TLS certificate hot-swapping without restart, and OpenTelemetry W3C distributed tracing.',
+    title: 'Multi-Tenant AI Gateway, Raft Consensus & OTel Tracing',
+    status: 'completed',
+    description: 'Cloud-native AI Gateway and distributed edge infrastructure: Server-Sent Events (SSE) non-blocking chunked streaming engine for LLM tokens (/v1/chat/completions), multi-tenant quota isolation and TTFT tracking (/ai-gateway-status), Raft consensus distributed cluster state synchronization (/raft-status, /raft/propose), and OpenTelemetry W3C distributed tracing with traceparent header injection (/otel-status).',
     features: [
-      'Server-Sent Events (SSE) non-blocking chunked streaming engine for LLM tokens',
-      'Multi-tenant tenant ID isolation with dynamic token quota rate-limiting',
-      'Raft consensus distributed cluster state synchronization',
-      'Dynamic TLS certificate hot-swapping without process restart',
-      'OpenTelemetry distributed tracing and W3C tracecontext propagation',
-      'DPDK kernel-bypass 100GbE line-rate packet processing',
+      'mod_ai_gateway: Multi-tenant Server-Sent Events (SSE) streaming proxy emitting text/event-stream chunks',
+      'OpenAI-compatible /v1/chat/completions endpoint with prompt/completion token billing and TTFT latency',
+      'Tenant quota tiers (Enterprise, Pro, Community) with hourly budget tracking and 429 quota exhaustion',
+      'mod_raft: Raft distributed consensus state machine (Leader, Candidate, Follower) with term & commit tracking',
+      'In-memory replicated state log (/raft/propose) synchronizing BPF blacklists and tenant quotas across cluster',
+      'mod_otel: OpenTelemetry distributed tracing complying with W3C Trace Context recommendation (traceparent)',
+      'Sub-microsecond span recorder ring buffer and OTLP collector endpoint integration (/otel-status)',
+      'Configuration directives in she.conf: ai_gateway.*, raft.*, otel.*',
     ],
-    codeHighlight: `/* Phase 8 Blueprint: AI Gateway & Raft Cluster */
-typedef struct {
-    char tenant_id[64];
-    uint64_t token_quota;
-    int (*stream_tokens)(she_connection_t *con, const char *chunk);
-    int (*raft_replicate_state)(she_server_t *srv, const void *log_entry);
-} she_ai_gateway_t;`,
+    codeHighlight: `/* Verified & Active in Phase 8 */
+int she_ai_gateway_stream_chat(she_server_t *srv, she_connection_t *con, const char *tenant_id, const char *model, const char *prompt);
+int she_raft_propose_entry(const char *key, const char *val, uint64_t *out_index);
+void she_otel_record_span(const char *trace_id, const char *name, uint64_t start_us, uint64_t dur_us, int status_code);
+she_plugin_t *mod_ai_gateway_plugin_init(void);
+she_plugin_t *mod_raft_plugin_init(void);
+she_plugin_t *mod_otel_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 9',
+    title: 'DPDK 100GbE Kernel Bypass, eBPF TC Flower & Hardware Mesh',
+    status: 'planned',
+    description: 'Next-generation hyper-scale line-rate infrastructure: DPDK poll mode drivers (PMD) for zero-copy line-rate 100GbE I/O, eBPF TC (Traffic Control) flower classification, hardware TLS offload crypto engines (kTLS), and distributed BGP EVPN multi-datacenter anycast.',
+    features: [
+      'DPDK (Data Plane Development Kit) poll mode drivers for 100Gbps line-rate kernel bypass',
+      'eBPF TC (Traffic Control) flower classification for sub-nanosecond micro-burst policing',
+      'Linux kTLS (Kernel TLS) hardware crypto acceleration with symmetric cipher offload',
+      'Distributed BGP EVPN multi-datacenter anycast routing mesh and failover convergence',
+    ],
+    codeHighlight: `/* Phase 9 Blueprint: DPDK & Hardware Offload Mesh */
+int she_dpdk_init_port(uint16_t port_id, struct rte_mempool *mbuf_pool);
+int she_ktls_enable_hardware_crypto(int socket_fd, const uint8_t *crypto_key);
+int she_tc_flower_filter_attach(const char *iface, uint32_t priority);`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[6]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[7]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -198,7 +216,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1, 2, 3, 4, 5, 6, and 7 Completed</span>
+          <span>Phase 1 through 8 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -207,12 +225,13 @@ export const RoadmapView: React.FC = () => {
           Evolution from a bare single-process epoll loop into an enterprise secure HTTP engine with standard{' '}
           <code className="text-emerald-300 font-mono">she_</code> prefix keywords, token-bucket rate limiting,
           RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, RFC 9113 HTTP/2,
-          WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, and gRPC Protobuf Transcoding.
+          WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, gRPC Protobuf Transcoding,
+          and Phase 8 Multi-Tenant AI Gateway with Raft Consensus and OpenTelemetry Distributed Tracing.
         </p>
       </div>
 
       {/* Milestones list */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-9 gap-2">
         {MILESTONES.map((m) => {
           const isSelected = selectedMilestone.phase === m.phase;
           const isCompleted = m.status === 'completed';

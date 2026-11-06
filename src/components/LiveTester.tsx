@@ -292,6 +292,54 @@ const PRESETS = [
     desc: 'Monitors unary, client streaming, server streaming, and bi-directional RPC counters.',
   },
   {
+    name: 'AI Gateway SSE Streaming (/v1/chat/completions)',
+    category: 'Phase 8',
+    method: 'GET',
+    path: '/v1/chat/completions?stream=true',
+    headers: { 'X-Tenant-ID': 'enterprise-corp' },
+    desc: 'Multi-tenant Server-Sent Events (SSE) streaming proxy emitting text/event-stream chunks.',
+  },
+  {
+    name: 'AI Gateway JSON Completion (/v1/chat/completions)',
+    category: 'Phase 8',
+    method: 'GET',
+    path: '/v1/chat/completions',
+    headers: { 'X-Tenant-ID': 'pro-dev-team' },
+    desc: 'Standard OpenAI-compatible JSON chat completion with usage token billing and model metadata.',
+  },
+  {
+    name: 'AI Gateway Telemetry (/ai-gateway-status)',
+    category: 'Phase 8',
+    method: 'GET',
+    path: '/ai-gateway-status?json=1',
+    headers: {},
+    desc: 'Multi-tenant hourly token quotas, prompt/completion counters, and TTFT (time-to-first-token) latency.',
+  },
+  {
+    name: 'Raft Cluster Consensus Status (/raft-status)',
+    category: 'Phase 8',
+    method: 'GET',
+    path: '/raft-status?json=1',
+    headers: {},
+    desc: 'Raft distributed state machine showing current term, cluster leader, commit index, and replicated peers.',
+  },
+  {
+    name: 'Raft Propose State Change (/raft/propose)',
+    category: 'Phase 8',
+    method: 'GET',
+    path: '/raft/propose?key=tenant_quota_boost&val=500000',
+    headers: {},
+    desc: 'Appends entry to Raft replicated state log and broadcasts to peer nodes across cluster quorum.',
+  },
+  {
+    name: 'OpenTelemetry Distributed Tracing (/otel-status)',
+    category: 'Phase 8',
+    method: 'GET',
+    path: '/otel-status?json=1',
+    headers: { traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' },
+    desc: 'W3C Trace Context parsing, distributed microsecond span recorder, and OTLP exporter metrics.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -582,7 +630,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            Phase 3 Security & HTTP Request Presets
+            SHE Production Engine Presets (Phases 1 - 8)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

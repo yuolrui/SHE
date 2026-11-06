@@ -74,11 +74,11 @@ export const PluginsView: React.FC = () => {
       {/* Intro Header */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
         <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mb-2">
-          <span className="text-emerald-400 font-bold">SHE: Phase 7 Active</span>
+          <span className="text-emerald-400 font-bold">SHE: Phase 8 Active</span>
           <span aria-hidden="true">·</span>
           <span>Lighttpd-style she_plugin_t Subsystem</span>
           <span aria-hidden="true">·</span>
-          <span>20 Active Modular Plugins</span>
+          <span>23 Active Modular Plugins</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE Modular Pipeline & Configuration Workbench
@@ -86,15 +86,17 @@ export const PluginsView: React.FC = () => {
         <p className="text-xs text-slate-300 leading-relaxed max-w-3xl mt-1">
           SHE&apos;s modular architecture decouples high-level HTTP features into isolated plugins that hook into URI cleaning,
           subrequest evaluation, and response finalization. Built-in modules include <code className="text-emerald-300">she_security</code>,{' '}
-          <code className="text-emerald-300">mod_auth</code>, <code className="text-emerald-300">mod_vhost</code>,{' '}
-          <code className="text-emerald-300">mod_deflate</code>, <code className="text-emerald-300">mod_rewrite</code>,{' '}
-          <code className="text-emerald-300">mod_proxy</code>, <code className="text-emerald-300">mod_websocket</code>,{' '}
-          <code className="text-emerald-300">mod_ssl</code>, <code className="text-emerald-300">mod_http2</code>,{' '}
+          <code className="text-emerald-300">mod_ai_gateway</code>, <code className="text-emerald-300">mod_raft</code>,{' '}
+          <code className="text-emerald-300">mod_otel</code>, <code className="text-emerald-300">mod_grpc</code>,{' '}
+          <code className="text-emerald-300">mod_quic</code>, <code className="text-emerald-300">mod_wireguard</code>,{' '}
           <code className="text-emerald-300">mod_wasm</code>, <code className="text-emerald-300">mod_ebpf</code>,{' '}
-          <code className="text-emerald-300">mod_acme</code>, <code className="text-emerald-300">mod_quic</code>,{' '}
-          <code className="text-emerald-300">mod_wireguard</code>, <code className="text-emerald-300">mod_grpc</code>,{' '}
-          <code className="text-emerald-300">mod_fastcgi</code>, <code className="text-emerald-300">mod_status</code>,{' '}
-          <code className="text-emerald-300">mod_indexfile</code>, <code className="text-emerald-300">mod_dirlisting</code>, and <code className="text-emerald-300">mod_accesslog</code>.
+          <code className="text-emerald-300">mod_acme</code>, <code className="text-emerald-300">mod_ssl</code>,{' '}
+          <code className="text-emerald-300">mod_http2</code>, <code className="text-emerald-300">mod_websocket</code>,{' '}
+          <code className="text-emerald-300">mod_proxy</code>, <code className="text-emerald-300">mod_deflate</code>,{' '}
+          <code className="text-emerald-300">mod_rewrite</code>, <code className="text-emerald-300">mod_auth</code>,{' '}
+          <code className="text-emerald-300">mod_vhost</code>, <code className="text-emerald-300">mod_fastcgi</code>,{' '}
+          <code className="text-emerald-300">mod_status</code>, <code className="text-emerald-300">mod_indexfile</code>,{' '}
+          <code className="text-emerald-300">mod_dirlisting</code>, and <code className="text-emerald-300">mod_accesslog</code>.
         </p>
       </div>
 
