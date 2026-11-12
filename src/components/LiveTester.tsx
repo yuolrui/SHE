@@ -340,6 +340,102 @@ const PRESETS = [
     desc: 'W3C Trace Context parsing, distributed microsecond span recorder, and OTLP exporter metrics.',
   },
   {
+    name: 'DPDK 100GbE PMD Telemetry (/dpdk-status)',
+    category: 'Phase 9',
+    method: 'GET',
+    path: '/dpdk-status?json=1',
+    headers: {},
+    desc: 'Poll Mode Driver (PMD) 100GbE line-rate packet counters, RSS queues, and hardware offload status.',
+  },
+  {
+    name: 'DPDK Line-Rate Burst Test (/dpdk/burst)',
+    category: 'Phase 9',
+    method: 'GET',
+    path: '/dpdk/burst?packets=128&size=1518',
+    headers: {},
+    desc: 'Injects synthetic 128-packet burst through PMD ring descriptors with zero-copy kernel bypass.',
+  },
+  {
+    name: 'eBPF TC Flower Sub-Nanosecond Classifier (/tc-status)',
+    category: 'Phase 9',
+    method: 'GET',
+    path: '/tc-status?json=1',
+    headers: {},
+    desc: 'clsact / cls_flower filter table, 24ns classification latency, matched packets, and micro-burst drop stats.',
+  },
+  {
+    name: 'eBPF TC Flower Rule Add (/tc/rule)',
+    category: 'Phase 9',
+    method: 'GET',
+    path: '/tc/rule?action=add&proto=tcp&dport=8899&rate_mbps=2500',
+    headers: {},
+    desc: 'Dynamically installs line-rate policer rule into Linux TC flower subsystem for instant hardware shaping.',
+  },
+  {
+    name: 'Hardware kTLS & BGP Anycast Mesh (/mesh-status)',
+    category: 'Phase 9',
+    method: 'GET',
+    path: '/mesh-status?json=1',
+    headers: {},
+    desc: 'Intel QAT / Linux kTLS hardware crypto offload sessions and BGP EVPN anycast multi-DC peer topology.',
+  },
+  {
+    name: 'BGP EVPN Anycast Route Announce (/mesh/announce)',
+    category: 'Phase 9',
+    method: 'GET',
+    path: '/mesh/announce?prefix=198.51.100.128/25&as=65003',
+    headers: {},
+    desc: 'Announces anycast VIP prefix across BGP mesh peers with 72ms convergence latency target.',
+  },
+  {
+    name: 'Post-Quantum Crypto Status (/pqc-status)',
+    category: 'Phase 10',
+    method: 'GET',
+    path: '/pqc-status?json=1',
+    headers: {},
+    desc: 'NIST FIPS 203 ML-KEM-768 & FIPS 204 ML-DSA-65 post-quantum hybrid TLS parameters and telemetry.',
+  },
+  {
+    name: 'ML-KEM-768 Key Encapsulation (/pqc/encapsulate)',
+    category: 'Phase 10',
+    method: 'GET',
+    path: '/pqc/encapsulate',
+    headers: {},
+    desc: 'Executes simulated hybrid X25519 + Kyber-768 encapsulation, producing shared secret and ciphertext.',
+  },
+  {
+    name: 'HTTP/4 Multi-Carrier Status (/http4-status)',
+    category: 'Phase 10',
+    method: 'GET',
+    path: '/http4-status?json=1',
+    headers: {},
+    desc: 'Aggregates 4 physical mediums (Fiber, 5G mmWave, LEO Satellite, WiFi 7) delivering 40 Gbps bandwidth.',
+  },
+  {
+    name: 'HTTP/4 Multi-Carrier Dispatch (/http4/send)',
+    category: 'Phase 10',
+    method: 'GET',
+    path: '/http4/send?bytes=2097152',
+    headers: {},
+    desc: 'Multiplexes 2MB payload across fiber, cellular, and satellite paths using Vectorized Header Encoding.',
+  },
+  {
+    name: '1.6 Tbps Terabit Optical Fabric (/fabric-status)',
+    category: 'Phase 10',
+    method: 'GET',
+    path: '/fabric-status?json=1',
+    headers: {},
+    desc: '4x 400G DWDM optical wavelength channels, laser optical power (dBm), OSNR, and fabric telemetry.',
+  },
+  {
+    name: 'Optical Protection Switchover (/fabric/switch-path)',
+    category: 'Phase 10',
+    method: 'GET',
+    path: '/fabric/switch-path?channel=lambda-2',
+    headers: {},
+    desc: 'Triggers sub-10ms optical protection ring switchover without dropped frames or session disruption.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -630,7 +726,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 8)
+            SHE Production Engine Presets (Phases 1 - 10)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

@@ -23,6 +23,12 @@
 #include "modules/mod_ai_gateway.h"
 #include "modules/mod_raft.h"
 #include "modules/mod_otel.h"
+#include "modules/mod_dpdk.h"
+#include "modules/mod_tc_flower.h"
+#include "modules/mod_hw_mesh.h"
+#include "modules/mod_pqc.h"
+#include "modules/mod_http4.h"
+#include "modules/mod_terabit_fabric.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -140,6 +146,12 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_ai_gateway_plugin_init());
     she_plugins_register(srv, mod_raft_plugin_init());
     she_plugins_register(srv, mod_otel_plugin_init());
+    she_plugins_register(srv, mod_dpdk_plugin_init());
+    she_plugins_register(srv, mod_tc_flower_plugin_init());
+    she_plugins_register(srv, mod_hw_mesh_plugin_init());
+    she_plugins_register(srv, mod_pqc_plugin_init());
+    she_plugins_register(srv, mod_http4_plugin_init());
+    she_plugins_register(srv, mod_terabit_fabric_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
