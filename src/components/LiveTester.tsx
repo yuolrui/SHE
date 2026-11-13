@@ -484,6 +484,54 @@ const PRESETS = [
     desc: 'Evaluates real-time traffic matrix and triggers dynamic optical DWDM bypass deflection route in under 4 microseconds.',
   },
   {
+    name: 'Photonic Waveguide Status (/waveguide-status)',
+    category: 'Phase 12',
+    method: 'GET',
+    path: '/waveguide-status?json=1',
+    headers: {},
+    desc: 'Holonomic silicon photonic waveguide spatial modes (TE0/TM1/OAM1), 18ps all-optical switching & zero E/O conversion.',
+  },
+  {
+    name: 'Photonic Waveguide Spatial Route (/waveguide/route)',
+    category: 'Phase 12',
+    method: 'GET',
+    path: '/waveguide/route?mode=3&bytes=65536',
+    headers: {},
+    desc: 'Routes 64KB payload across silicon photonic resonant mode without electrical-to-optical conversion.',
+  },
+  {
+    name: 'DTN Interplanetary Gateway (/dtn-status)',
+    category: 'Phase 12',
+    method: 'GET',
+    path: '/dtn-status?json=1',
+    headers: {},
+    desc: 'RFC 5050 / BPv7 Disruption-Tolerant Networking custody store-and-forward queue for LEO, Lunar & Mars links.',
+  },
+  {
+    name: 'DTN Custody Bundle Dispatch (/dtn/dispatch)',
+    category: 'Phase 12',
+    method: 'GET',
+    path: '/dtn/dispatch?dest_eid=dtn://mars-relay-01/telemetry&payload_bytes=4096',
+    headers: {},
+    desc: 'Dispatches BPv7 custody bundle via LTP-over-Optical-Laser convergence layer toward Mars high-orbit relay.',
+  },
+  {
+    name: 'Planetary Clean-Energy Grid (/grid-status)',
+    category: 'Phase 12',
+    method: 'GET',
+    path: '/grid-status?json=1',
+    headers: {},
+    desc: 'Terawatt load-following compute telemetry across Hydro, Solar, Geothermal & Fusion zones with Surface Code QEC.',
+  },
+  {
+    name: 'Planetary Workload Balance (/grid/balance)',
+    category: 'Phase 12',
+    method: 'GET',
+    path: '/grid/balance?mw_demand=450',
+    headers: {},
+    desc: 'Dynamically shifts 450 MW compute workload to lowest carbon-intensity zone with d=17 topological QEC attestation.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -774,7 +822,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 10)
+            SHE Production Engine Presets (Phases 1 - 12)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

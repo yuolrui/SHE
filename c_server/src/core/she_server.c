@@ -32,6 +32,9 @@
 #include "modules/mod_qkd.h"
 #include "modules/mod_nanocore.h"
 #include "modules/mod_neural_routing.h"
+#include "modules/mod_waveguide.h"
+#include "modules/mod_dtn_bundle.h"
+#include "modules/mod_planetary_grid.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -158,6 +161,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_qkd_plugin_init());
     she_plugins_register(srv, mod_nanocore_plugin_init());
     she_plugins_register(srv, mod_neural_routing_plugin_init());
+    she_plugins_register(srv, mod_waveguide_plugin_init());
+    she_plugins_register(srv, mod_dtn_bundle_plugin_init());
+    she_plugins_register(srv, mod_planetary_grid_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
