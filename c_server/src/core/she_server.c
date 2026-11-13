@@ -29,6 +29,9 @@
 #include "modules/mod_pqc.h"
 #include "modules/mod_http4.h"
 #include "modules/mod_terabit_fabric.h"
+#include "modules/mod_qkd.h"
+#include "modules/mod_nanocore.h"
+#include "modules/mod_neural_routing.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -152,6 +155,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_pqc_plugin_init());
     she_plugins_register(srv, mod_http4_plugin_init());
     she_plugins_register(srv, mod_terabit_fabric_plugin_init());
+    she_plugins_register(srv, mod_qkd_plugin_init());
+    she_plugins_register(srv, mod_nanocore_plugin_init());
+    she_plugins_register(srv, mod_neural_routing_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
