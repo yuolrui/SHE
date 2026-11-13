@@ -279,23 +279,43 @@ she_plugin_t *mod_planetary_grid_plugin_init(void);`,
   {
     phase: 'Phase 13',
     title: 'Autonomous Self-Healing Kernel & Formal Verification Suite',
-    status: 'planned',
-    description: 'Next engineering frontier: Automated C11 unit & fuzzing verification harness, SIGHUP live configuration hot-reload without dropping active sockets, and hardware-enforced capability sandboxing.',
+    status: 'completed',
+    description: 'Production hardening, zero-downtime live operations, and formal C11 verification: Automated C11 unit & AddressSanitizer/UBSan test harness (make test, make asan), zero-downtime SIGHUP & API configuration hot-reload (/self-heal-status, /self-heal/reload), graceful Keep-Alive connection draining, /proc/self/status seccomp/Landlock capability audit (/sandbox-status, /sandbox/audit), and real-time Prometheus OpenMetrics exporter (/metrics, /metrics-json).',
     features: [
-      'Comprehensive C11 unit test suite & AddressSanitizer/UBSan CI gates via make test',
-      'Zero-downtime SIGHUP configuration reload & graceful Keep-Alive connection draining',
-      'seccomp-bpf & Landlock ABI syscall sandboxing per worker process',
-      'Real-time Prometheus /metrics scraping & interactive Telemetry Dashboard in Web UI',
+      'tests/she_unit_tests.c: Automated C11 regression suite & AddressSanitizer/UBSan leak-check gates (make test / make asan)',
+      'mod_self_heal: Zero-downtime SIGHUP & HTTP /self-heal/reload config hot-reloader + FD-table watchdog',
+      'Graceful Keep-Alive connection draining on SIGINT/SIGTERM via she_server_drain_connections()',
+      'mod_sandbox: Live /proc/self/status Seccomp & NoNewPrivs probe + Landlock ABI v4 capability profile (/sandbox/audit)',
+      'mod_metrics: Live Prometheus OpenMetrics 0.0.4 (/metrics) & JSON (/metrics-json) scraping directly from she_server_stats_t',
+      'Configuration directives in she.conf: self_heal.*, sandbox.*, metrics.*',
     ],
-    codeHighlight: `/* Phase 13 Blueprint: Self-Healing & Verification */
+    codeHighlight: `/* Verified & Active in Phase 13 */
 int she_server_hot_reload_config(she_server_t *srv, const char *conf_path);
-int she_sandbox_apply_seccomp_profile(she_worker_role_t role);
-int she_test_run_all_suites(void);`,
+int she_server_drain_connections(she_server_t *srv, int max_wait_ms);
+int she_sandbox_audit_profile(she_sandbox_state_t *out_state);
+she_plugin_t *mod_self_heal_plugin_init(void);
+she_plugin_t *mod_sandbox_plugin_init(void);
+she_plugin_t *mod_metrics_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 14',
+    title: 'Real-Time Kernel eBPF Socket Splice & Containerized Cloud Mesh',
+    status: 'planned',
+    description: 'Next infrastructure stage: Multi-stage Docker distribution with distroless runtime, real upstream connection pooling in mod_proxy, and live Web UI Telemetry Dashboard consuming /metrics.',
+    features: [
+      'Multi-stage Dockerfile & Helm/Compose deployment manifests for standalone SHE binary',
+      'Persistent upstream keep-alive TCP connection pool for mod_proxy & mod_fastcgi',
+      'Interactive Prometheus /metrics real-time telemetry chart dashboard in the Web UI',
+      'Real-time mTLS mutual authentication client certificate verification via OpenSSL 3.0',
+    ],
+    codeHighlight: `/* Phase 14 Blueprint: Cloud Mesh & Persistent Pooling */
+int she_proxy_pool_acquire_upstream(const char *backend_addr, int *out_fd);
+int she_ssl_verify_mtls_client_cert(she_connection_t *con);`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[11]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[12]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -306,7 +326,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1 through 12 Completed</span>
+          <span>Phase 1 through 13 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -317,8 +337,8 @@ export const RoadmapView: React.FC = () => {
           RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, RFC 9113 HTTP/2,
           WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, gRPC Protobuf Transcoding,
           AI Gateway with Raft Consensus, OpenTelemetry Tracing, DPDK 100GbE Kernel Bypass, eBPF TC Flower, Hardware kTLS Mesh,
-          Phase 10 Post-Quantum Cryptography & 1.6 Tbps Optical Fabric, Phase 11 QKD Mesh, Nanocore Slab Allocator & Neural Routing,
-          and Phase 12 Holonomic Silicon Photonic Waveguides, BPv7 DTN Interplanetary Gateway & Terawatt Clean-Energy Grid.
+          Phase 10–12 PQC, Optical Fabric, QKD, Nanocore, Neural Routing, Photonic Waveguides & Planetary Grid,
+          and Phase 13 Autonomous Self-Healing SIGHUP Reload, seccomp/Landlock Sandbox, Prometheus /metrics & ASAN/UBSan C11 Test Suite.
         </p>
       </div>
 

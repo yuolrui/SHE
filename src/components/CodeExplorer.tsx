@@ -93,6 +93,12 @@ const FILE_NOTES: Record<string, string> = {
   'src/modules/mod_dtn_bundle.h': 'mod_dtn_bundle EID peer structs, custody store counters, and interplanetary bundle dispatch API.',
   'src/modules/mod_planetary_grid.c': 'Terawatt Clean-Energy Load-Following & Surface Code QEC Engine. Balances compute demand across renewable grids by carbon intensity with d=17 topological QEC attestation (/grid-status, /grid/balance).',
   'src/modules/mod_planetary_grid.h': 'mod_planetary_grid zone telemetry structures, Surface Code error metrics, and workload balancing prototypes.',
+  'src/modules/mod_self_heal.c': 'Autonomous Self-Healing Supervisor. Performs FD-table connection integrity checks and zero-downtime SIGHUP / API hot configuration reload (/self-heal-status, /self-heal/reload).',
+  'src/modules/mod_self_heal.h': 'mod_self_heal supervisor state struct and hot-reload trigger declarations.',
+  'src/modules/mod_sandbox.c': 'seccomp-bpf & Landlock ABI Capability Sandbox. Probes /proc/self/status Seccomp & NoNewPrivs flags and exposes capability audit reports (/sandbox-status, /sandbox/audit).',
+  'src/modules/mod_sandbox.h': 'mod_sandbox capability profile struct and syscall audit prototypes.',
+  'src/modules/mod_metrics.c': 'Prometheus OpenMetrics 0.0.4 Exporter. Dynamically serializes live she_server_stats_t and she_security_t counters and HTTP code histograms (/metrics, /metrics-json).',
+  'src/modules/mod_metrics.h': 'mod_metrics plugin initialization declaration.',
   'src/event/she_fdevent.c': 'Linux epoll abstraction layer. Implements epoll_create1, epoll_ctl, and epoll_wait event multiplexing loop.',
   'src/event/she_fdevent.h': 'she_fdevent_system_t definition, SHE_FDEVENT_IN, SHE_FDEVENT_OUT, and callback prototypes.',
   'src/net/she_net.c': 'Low-level socket creation, non-blocking fcntl(O_NONBLOCK), TCP_NODELAY, SO_REUSEADDR, and accept handling.',
@@ -102,8 +108,9 @@ const FILE_NOTES: Record<string, string> = {
   'src/http/she_mime.c': 'Fast static extension-to-MIME-type mapping table (HTML, CSS, JS, JSON, images, fonts, WASM, conf).',
   'src/http/she_mime.h': 'MIME lookup declaration.',
   'src/main.c': 'SHE entry point, CLI argument parser (-c, -p, -d, -k, -m, -v), signal handlers, and ASCII banner.',
+  'tests/she_unit_tests.c': 'Automated C11 unit & formal verification suite testing buffers, HTTP parser, traversal defense, rate limiter, config loader, and plugin APIs (make test / make asan).',
   'she.conf': 'SHE server runtime configuration file. Directives for server, security rate limiting, auth, and virtual hosts.',
-  'Makefile': 'Modular GCC build recipe targeting C11, -Wall, -Wextra, -O2, and subfolder compilation.',
+  'Makefile': 'Modular GCC build recipe targeting C11, -Wall, -Wextra, -O2, ASAN/UBSan, and subfolder compilation.',
 };
 
 const FOLDER_LABELS: Record<string, { label: string; desc: string }> = {
@@ -114,6 +121,7 @@ const FOLDER_LABELS: Record<string, { label: string; desc: string }> = {
   net: { label: 'src/net/', desc: 'TCP & Socket Layer' },
   http: { label: 'src/http/', desc: 'Parser & MIME Mapping' },
   main: { label: 'src/', desc: 'Server Entry Point' },
+  tests: { label: 'tests/', desc: 'C11 Unit & ASAN Suite' },
   config: { label: 'config/', desc: 'Runtime she.conf' },
   build: { label: './', desc: 'Build Configuration' },
 };

@@ -8,9 +8,13 @@
 #include <getopt.h>
 
 static volatile sig_atomic_t g_shutdown = 0;
+static volatile sig_atomic_t g_reload = 0;
 
 static void sig_handler(int sig) {
-    (void)sig;
+    if (sig == SIGHUP) {
+        g_reload = 1;
+        return;
+    }
     g_shutdown = 1;
     if (g_she_server) {
         g_she_server->is_running = 0;
@@ -72,13 +76,17 @@ int main(int argc, char *argv[]) {
     
     /* Auto-load she.conf if present */
     if (access("she.conf", R_OK) == 0) {
+        snprintf(config.config_file, sizeof(config.config_file), "%s", "she.conf");
         she_config_load_file(&config, "she.conf");
     }
     
     int opt;
     while ((opt = getopt(argc, argv, "c:p:b:d:w:k:m:vh")) != -1) {
         switch (opt) {
-            case 'c': she_config_load_file(&config, optarg); break;
+            case 'c':
+                snprintf(config.config_file, sizeof(config.config_file), "%s", optarg);
+                she_config_load_file(&config, optarg);
+                break;
             case 'p': config.port = atoi(optarg); break;
             case 'b': strncpy(config.bind_ip, optarg, sizeof(config.bind_ip) - 1); break;
             case 'd': strncpy(config.document_root, optarg, sizeof(config.document_root) - 1); break;
@@ -98,6 +106,7 @@ int main(int argc, char *argv[]) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
     signal(SIGPIPE, SIG_IGN);
     
     printf("=====================================================\n");
@@ -138,10 +147,17 @@ int main(int argc, char *argv[]) {
     printf("[READY] SHE server started successfully. Press Ctrl+C to terminate.\n");
     
     while (!g_shutdown && srv->is_running) {
+        if (g_reload) {
+            g_reload = 0;
+            she_server_hot_reload_config(srv, srv->config.config_file);
+            printf("[RELOAD] Zero-downtime SIGHUP config reload completed (#%llu)\n",
+                   (unsigned long long)srv->stats.config_reloads);
+        }
         she_server_step(srv, 100);
     }
     
-    printf("\n[SHUTDOWN] Terminating SHE gracefully...\n");
+    printf("\n[SHUTDOWN] Draining active connections and terminating SHE gracefully...\n");
+    she_server_drain_connections(srv, 250);
     printf(" Statistics summary:\n");
     printf("  Total Connections: %llu\n", (unsigned long long)srv->stats.total_connections);
     printf("  Total Requests:    %llu\n", (unsigned long long)srv->stats.total_requests);

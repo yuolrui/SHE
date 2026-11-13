@@ -532,6 +532,54 @@ const PRESETS = [
     desc: 'Dynamically shifts 450 MW compute workload to lowest carbon-intensity zone with d=17 topological QEC attestation.',
   },
   {
+    name: 'Self-Healing Watchdog (/self-heal-status)',
+    category: 'Phase 13',
+    method: 'GET',
+    path: '/self-heal-status?json=1',
+    headers: {},
+    desc: 'Inspects autonomous connection-slot watchdog, FD leak protection, and SIGHUP zero-downtime reload readiness.',
+  },
+  {
+    name: 'Zero-Downtime Hot Reload (/self-heal/reload)',
+    category: 'Phase 13',
+    method: 'GET',
+    path: '/self-heal/reload',
+    headers: {},
+    desc: 'Re-parses she.conf live without closing the listening socket or dropping active Keep-Alive connections.',
+  },
+  {
+    name: 'Capability Sandbox Status (/sandbox-status)',
+    category: 'Phase 13',
+    method: 'GET',
+    path: '/sandbox-status?json=1',
+    headers: {},
+    desc: 'Probes /proc/self/status Seccomp & NoNewPrivs flags, Landlock ABI v4 readiness, and syscall allowlist.',
+  },
+  {
+    name: 'Syscall & Formal Verification Audit (/sandbox/audit)',
+    category: 'Phase 13',
+    method: 'GET',
+    path: '/sandbox/audit',
+    headers: {},
+    desc: 'Executes live capability sandbox verification confirming C11 ASAN/UBSan formal test compliance.',
+  },
+  {
+    name: 'Prometheus OpenMetrics (/metrics)',
+    category: 'Phase 13',
+    method: 'GET',
+    path: '/metrics',
+    headers: {},
+    desc: 'Scrapes live C11 engine counters & gauges (connections, requests, bytes, reloads, HTTP codes) in OpenMetrics 0.0.4.',
+  },
+  {
+    name: 'Telemetry JSON Snapshot (/metrics-json)',
+    category: 'Phase 13',
+    method: 'GET',
+    path: '/metrics-json',
+    headers: {},
+    desc: 'Returns structured JSON telemetry snapshot of real-time engine counters and rate-limiter statistics.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -822,7 +870,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 12)
+            SHE Production Engine Presets (Phases 1 - 13)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

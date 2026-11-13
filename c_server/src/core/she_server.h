@@ -76,6 +76,10 @@ typedef struct {
     uint64_t requests_compressed;
     uint64_t bytes_compressed_saved;
     uint64_t requests_proxied;
+
+    /* Phase 13 self-healing & reload metrics */
+    uint64_t config_reloads;
+    time_t last_reload_time;
 } she_server_stats_t;
 
 struct she_server {
@@ -106,6 +110,8 @@ void she_server_free(she_server_t *srv);
 int she_server_start(she_server_t *srv);
 void she_server_stop(she_server_t *srv);
 int she_server_step(she_server_t *srv, int timeout_ms);
+int she_server_hot_reload_config(she_server_t *srv, const char *conf_path);
+int she_server_drain_connections(she_server_t *srv, int max_wait_ms);
 
 void she_server_close_connection(she_server_t *srv, she_connection_t *con);
 

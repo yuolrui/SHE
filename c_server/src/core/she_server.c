@@ -35,6 +35,10 @@
 #include "modules/mod_waveguide.h"
 #include "modules/mod_dtn_bundle.h"
 #include "modules/mod_planetary_grid.h"
+#include "modules/mod_self_heal.h"
+#include "modules/mod_sandbox.h"
+#include "modules/mod_metrics.h"
+#include "core/she_config.h"
 #include "security/she_security.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -164,6 +168,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_waveguide_plugin_init());
     she_plugins_register(srv, mod_dtn_bundle_plugin_init());
     she_plugins_register(srv, mod_planetary_grid_plugin_init());
+    she_plugins_register(srv, mod_self_heal_plugin_init());
+    she_plugins_register(srv, mod_sandbox_plugin_init());
+    she_plugins_register(srv, mod_metrics_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
@@ -284,3 +291,42 @@ int she_server_step(she_server_t *srv, int timeout_ms) {
     she_server_check_timeouts(srv);
     return nfds;
 }
+
+int she_server_hot_reload_config(she_server_t *srv, const char *conf_path) {
+    if (!srv) return -1;
+    she_server_config_t updated = srv->config;
+    const char *path = (conf_path && conf_path[0]) ? conf_path : "she.conf";
+    int loaded = she_config_load_file(&updated, path);
+    if (loaded == 0) {
+        srv->config.keepalive_timeout_sec = updated.keepalive_timeout_sec;
+        srv->config.max_keepalive_requests = updated.max_keepalive_requests;
+        srv->config.deflate_enabled = updated.deflate_enabled;
+        srv->config.deflate_min_size = updated.deflate_min_size;
+        srv->config.security_cfg = updated.security_cfg;
+        if (srv->security) {
+            srv->security->config = updated.security_cfg;
+        }
+    }
+    srv->stats.config_reloads++;
+    srv->stats.last_reload_time = time(NULL);
+    return loaded;
+}
+
+int she_server_drain_connections(she_server_t *srv, int max_wait_ms) {
+    if (!srv) return -1;
+    if (srv->srv_socket >= 0) {
+        she_fdevent_unregister(srv->ev, srv->srv_socket);
+        close(srv->srv_socket);
+        srv->srv_socket = -1;
+    }
+    int elapsed = 0;
+    const int step_ms = 25;
+    while (srv->stats.active_connections > 0 && elapsed < max_wait_ms) {
+        she_fdevent_poll(srv->ev, step_ms);
+        she_server_check_timeouts(srv);
+        elapsed += step_ms;
+    }
+    srv->is_running = 0;
+    return (int)srv->stats.active_connections;
+}
+
