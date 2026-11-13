@@ -6,6 +6,7 @@ import { LiveTester } from './components/LiveTester';
 import { BenchmarkLab } from './components/BenchmarkLab';
 import { RoadmapView } from './components/RoadmapView';
 import { PluginsView } from './components/PluginsView';
+import { TelemetryDashboard } from './components/TelemetryDashboard';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('overview');
@@ -59,6 +60,7 @@ export default function App() {
         {activeTab === 'overview' && <ArchitectureView />}
         {activeTab === 'code' && <CodeExplorer />}
         {activeTab === 'tester' && <LiveTester />}
+        {activeTab === 'telemetry' && <TelemetryDashboard />}
         {activeTab === 'plugins' && <PluginsView />}
         {activeTab === 'benchmark' && <BenchmarkLab />}
         {activeTab === 'roadmap' && <RoadmapView />}

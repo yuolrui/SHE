@@ -580,6 +580,54 @@ const PRESETS = [
     desc: 'Returns structured JSON telemetry snapshot of real-time engine counters and rate-limiter statistics.',
   },
   {
+    name: 'eBPF SOCKMAP Proxy Pool (/proxy-pool-status)',
+    category: 'Phase 14',
+    method: 'GET',
+    path: '/proxy-pool-status?json=1',
+    headers: {},
+    desc: 'Inspects persistent upstream Keep-Alive TCP connection pool slots, eBPF SOCKMAP bindings, and hit ratio.',
+  },
+  {
+    name: 'Acquire Upstream Splice (/proxy-pool/acquire)',
+    category: 'Phase 14',
+    method: 'GET',
+    path: '/proxy-pool/acquire?backend=127.0.0.1:3000',
+    headers: {},
+    desc: 'Acquires an idle upstream keep-alive slot and splices client-to-backend socket traffic via eBPF SOCKMAP.',
+  },
+  {
+    name: 'OpenSSL 3.0 mTLS Status (/mtls-status)',
+    category: 'Phase 14',
+    method: 'GET',
+    path: '/mtls-status?json=1',
+    headers: {},
+    desc: 'Inspects Mutual TLS SPIFFE trust domain, OCSP stapling status, and X.509 client verification counters.',
+  },
+  {
+    name: 'Verify SPIFFE mTLS Cert (/mtls/verify)',
+    category: 'Phase 14',
+    method: 'GET',
+    path: '/mtls/verify?spiffe_id=spiffe://she.mesh/ns/prod/sa/api-gateway',
+    headers: {},
+    desc: 'Executes OpenSSL 3.0 EVP SHA-256 certificate chain verification against the SHE mesh SPIFFE trust domain.',
+  },
+  {
+    name: 'Cloud Mesh Sidecar (/cloud-mesh-status)',
+    category: 'Phase 14',
+    method: 'GET',
+    path: '/cloud-mesh-status',
+    headers: {},
+    desc: 'Returns containerized cloud mesh pod identity, distroless image tag, readiness state, and probe metrics.',
+  },
+  {
+    name: 'Kubernetes Healthz Probe (/cloud-mesh/healthz)',
+    category: 'Phase 14',
+    method: 'GET',
+    path: '/cloud-mesh/healthz',
+    headers: {},
+    desc: 'Kubernetes liveness/readiness probe controller reporting live C11 plugin count and active connections.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -870,7 +918,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 13)
+            SHE Production Engine Presets (Phases 1 - 14)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

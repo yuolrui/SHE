@@ -20,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'overview', label: 'Architecture' },
     { id: 'code', label: 'Code Explorer' },
     { id: 'tester', label: 'Security & Tester' },
+    { id: 'telemetry', label: 'Telemetry' },
     { id: 'plugins', label: 'Modules & Logs' },
     { id: 'benchmark', label: 'Benchmark' },
     { id: 'roadmap', label: 'Roadmap' },

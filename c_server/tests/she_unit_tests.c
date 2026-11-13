@@ -14,6 +14,8 @@
 #include "modules/mod_dtn_bundle.h"
 #include "modules/mod_planetary_grid.h"
 #include "modules/mod_sandbox.h"
+#include "modules/mod_proxy_pool.h"
+#include "modules/mod_mtls.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -125,6 +127,16 @@ static void test_config_loader_and_plugins(void) {
     she_sandbox_state_t sb;
     SHE_TEST_ASSERT(she_sandbox_audit_profile(&sb) == 0, "sandbox audit succeeds");
     SHE_TEST_ASSERT(sb.allowed_syscalls > 0, "sandbox allowlist populated");
+
+    int slot = -1;
+    SHE_TEST_ASSERT(she_proxy_pool_acquire_upstream("127.0.0.1:3000", &slot) == 0, "proxy pool acquires upstream");
+    SHE_TEST_ASSERT(slot >= 0, "proxy pool returns valid slot id");
+    SHE_TEST_ASSERT(she_proxy_pool_release_upstream(slot) == 0, "proxy pool releases slot cleanly");
+
+    char fp[65] = {0};
+    SHE_TEST_ASSERT(she_ssl_verify_mtls_client_cert("spiffe://she.mesh/ns/prod/sa/api", fp, sizeof(fp)) == 0, "valid SPIFFE ID verified");
+    SHE_TEST_ASSERT(strlen(fp) == 64, "mTLS SHA-256 fingerprint is 64 hex chars");
+    SHE_TEST_ASSERT(she_ssl_verify_mtls_client_cert("spiffe://untrusted.org/evil", fp, sizeof(fp)) != 0, "untrusted SPIFFE domain rejected");
 }
 
 int main(void) {

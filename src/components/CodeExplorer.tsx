@@ -99,6 +99,12 @@ const FILE_NOTES: Record<string, string> = {
   'src/modules/mod_sandbox.h': 'mod_sandbox capability profile struct and syscall audit prototypes.',
   'src/modules/mod_metrics.c': 'Prometheus OpenMetrics 0.0.4 Exporter. Dynamically serializes live she_server_stats_t and she_security_t counters and HTTP code histograms (/metrics, /metrics-json).',
   'src/modules/mod_metrics.h': 'mod_metrics plugin initialization declaration.',
+  'src/modules/mod_proxy_pool.c': 'Persistent Upstream Keep-Alive TCP Connection Pool & eBPF SOCKMAP Kernel Socket Splice. Manages idle/active backend slots and splices sockets via /proxy-pool/acquire and /proxy-pool-status.',
+  'src/modules/mod_proxy_pool.h': 'mod_proxy_pool slot structs, SOCKMAP pool state, and acquire/release declarations.',
+  'src/modules/mod_mtls.c': 'OpenSSL 3.0 Mutual TLS (mTLS) SPIFFE/X.509 Client Certificate Chain Verifier. Computes live EVP SHA-256 fingerprints and enforces trust domains via /mtls/verify and /mtls-status.',
+  'src/modules/mod_mtls.h': 'mod_mtls SPIFFE trust domain state and client certificate verification prototypes.',
+  'src/modules/mod_cloud_mesh.c': 'Containerized Cloud Mesh Sidecar & Kubernetes Healthz/Readyz Probe Controller. Exposes pod readiness, active connections, and plugin status on /cloud-mesh-status, /cloud-mesh/healthz, and /cloud-mesh/readyz.',
+  'src/modules/mod_cloud_mesh.h': 'mod_cloud_mesh sidecar descriptor and initialization prototype.',
   'src/event/she_fdevent.c': 'Linux epoll abstraction layer. Implements epoll_create1, epoll_ctl, and epoll_wait event multiplexing loop.',
   'src/event/she_fdevent.h': 'she_fdevent_system_t definition, SHE_FDEVENT_IN, SHE_FDEVENT_OUT, and callback prototypes.',
   'src/net/she_net.c': 'Low-level socket creation, non-blocking fcntl(O_NONBLOCK), TCP_NODELAY, SO_REUSEADDR, and accept handling.',
@@ -111,6 +117,8 @@ const FILE_NOTES: Record<string, string> = {
   'tests/she_unit_tests.c': 'Automated C11 unit & formal verification suite testing buffers, HTTP parser, traversal defense, rate limiter, config loader, and plugin APIs (make test / make asan).',
   'she.conf': 'SHE server runtime configuration file. Directives for server, security rate limiting, auth, and virtual hosts.',
   'Makefile': 'Modular GCC build recipe targeting C11, -Wall, -Wextra, -O2, ASAN/UBSan, and subfolder compilation.',
+  'Dockerfile': 'Multi-stage Debian bookworm-slim build and hardened non-root runtime container exposing port 8899 with Kubernetes-compatible HEALTHCHECK.',
+  'docker-compose.yml': 'Hardened production deployment manifest enforcing read-only rootfs, cap_drop: ALL, NET_BIND_SERVICE, and automated health checks.',
 };
 
 const FOLDER_LABELS: Record<string, { label: string; desc: string }> = {
@@ -124,6 +132,7 @@ const FOLDER_LABELS: Record<string, { label: string; desc: string }> = {
   tests: { label: 'tests/', desc: 'C11 Unit & ASAN Suite' },
   config: { label: 'config/', desc: 'Runtime she.conf' },
   build: { label: './', desc: 'Build Configuration' },
+  deploy: { label: 'deploy/', desc: 'Docker & Cloud Mesh' },
 };
 
 export const CodeExplorer: React.FC = () => {

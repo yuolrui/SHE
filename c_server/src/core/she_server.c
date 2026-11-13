@@ -38,6 +38,9 @@
 #include "modules/mod_self_heal.h"
 #include "modules/mod_sandbox.h"
 #include "modules/mod_metrics.h"
+#include "modules/mod_proxy_pool.h"
+#include "modules/mod_mtls.h"
+#include "modules/mod_cloud_mesh.h"
 #include "core/she_config.h"
 #include "security/she_security.h"
 #include <stdlib.h>
@@ -171,6 +174,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_self_heal_plugin_init());
     she_plugins_register(srv, mod_sandbox_plugin_init());
     she_plugins_register(srv, mod_metrics_plugin_init());
+    she_plugins_register(srv, mod_proxy_pool_plugin_init());
+    she_plugins_register(srv, mod_mtls_plugin_init());
+    she_plugins_register(srv, mod_cloud_mesh_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());

@@ -1,0 +1,26 @@
+services:
+  she-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: she-secure-http-engine
+    ports:
+      - "8899:8899"
+    volumes:
+      - ./she.conf:/opt/she/she.conf:ro
+      - ./www:/opt/she/www:ro
+    read_only: true
+    tmpfs:
+      - /opt/she/logs:rw,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8899/cloud-mesh/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped

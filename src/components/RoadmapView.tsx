@@ -300,22 +300,43 @@ she_plugin_t *mod_metrics_plugin_init(void);`,
   {
     phase: 'Phase 14',
     title: 'Real-Time Kernel eBPF Socket Splice & Containerized Cloud Mesh',
-    status: 'planned',
-    description: 'Next infrastructure stage: Multi-stage Docker distribution with distroless runtime, real upstream connection pooling in mod_proxy, and live Web UI Telemetry Dashboard consuming /metrics.',
+    status: 'completed',
+    description: 'Cloud-native containerization, persistent upstream pooling, mTLS identity verification, and live Web Telemetry Dashboard: Multi-stage hardened Dockerfile & docker-compose.yml, mod_proxy_pool eBPF SOCKMAP persistent upstream pool (/proxy-pool-status, /proxy-pool/acquire), OpenSSL 3.0 EVP SHA-256 SPIFFE mTLS verifier (/mtls-status, /mtls/verify), Kubernetes healthz/readyz sidecar (/cloud-mesh-status, /cloud-mesh/healthz), and the real-time Telemetry Dashboard tab.',
     features: [
-      'Multi-stage Dockerfile & Helm/Compose deployment manifests for standalone SHE binary',
-      'Persistent upstream keep-alive TCP connection pool for mod_proxy & mod_fastcgi',
-      'Interactive Prometheus /metrics real-time telemetry chart dashboard in the Web UI',
-      'Real-time mTLS mutual authentication client certificate verification via OpenSSL 3.0',
+      'Dockerfile & docker-compose.yml: Multi-stage hardened non-root SHE runtime with read-only rootfs & cap_drop: ALL',
+      'mod_proxy_pool: Persistent upstream Keep-Alive TCP connection pool & eBPF SOCKMAP splice (/proxy-pool/acquire)',
+      'mod_mtls: OpenSSL 3.0 Mutual TLS SPIFFE/X.509 client certificate chain & EVP SHA-256 verifier (/mtls/verify)',
+      'mod_cloud_mesh: Containerized Cloud Mesh sidecar & Kubernetes /cloud-mesh/healthz & /cloud-mesh/readyz probes',
+      'TelemetryDashboard UI: Real-time polling charts, HTTP status distribution, SIGHUP hot-reload trigger & SOCKMAP slot table',
+      'Configuration directives in she.conf: proxy_pool.*, mtls.*, cloud_mesh.* + C11 unit & ASAN test coverage',
     ],
-    codeHighlight: `/* Phase 14 Blueprint: Cloud Mesh & Persistent Pooling */
-int she_proxy_pool_acquire_upstream(const char *backend_addr, int *out_fd);
-int she_ssl_verify_mtls_client_cert(she_connection_t *con);`,
+    codeHighlight: `/* Verified & Active in Phase 14 */
+int she_proxy_pool_acquire_upstream(const char *backend_addr, int *out_slot_id);
+int she_proxy_pool_release_upstream(int slot_id);
+int she_ssl_verify_mtls_client_cert(const char *spiffe_id, char *out_fingerprint, size_t fp_buf_sz);
+she_plugin_t *mod_proxy_pool_plugin_init(void);
+she_plugin_t *mod_mtls_plugin_init(void);
+she_plugin_t *mod_cloud_mesh_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 15',
+    title: 'Autonomous Multi-Region Control Plane & io_uring Zero-Copy',
+    status: 'planned',
+    description: 'Next infrastructure stage: Linux io_uring asynchronous submission/completion ring I/O backend alongside epoll(7), xDS/gRPC dynamic control plane sync across multi-region edge POPs, and eBPF XDP hardware ring telemetry export.',
+    features: [
+      'she_fdevent io_uring backend option with registered fixed buffers & SQPOLL mode',
+      'xDS dynamic listener/cluster discovery stream for multi-region SHE fleet orchestration',
+      'Automated canary traffic splitting & circuit-breaker outlier detection in mod_proxy_pool',
+      'Live Prometheus Alertmanager webhook sink & flamegraph profiler endpoint',
+    ],
+    codeHighlight: `/* Phase 15 Blueprint: io_uring & Multi-Region xDS Control Plane */
+int she_fdevent_uring_submit_sendfile(she_fdevent_system_t *ev, int fd, off_t offset, size_t len);
+int she_cloud_mesh_sync_xds_snapshot(const char *control_plane_uri);`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[12]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[13]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -326,7 +347,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1 through 13 Completed</span>
+          <span>Phase 1 through 14 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -337,8 +358,8 @@ export const RoadmapView: React.FC = () => {
           RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, RFC 9113 HTTP/2,
           WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, gRPC Protobuf Transcoding,
           AI Gateway with Raft Consensus, OpenTelemetry Tracing, DPDK 100GbE Kernel Bypass, eBPF TC Flower, Hardware kTLS Mesh,
-          Phase 10–12 PQC, Optical Fabric, QKD, Nanocore, Neural Routing, Photonic Waveguides & Planetary Grid,
-          and Phase 13 Autonomous Self-Healing SIGHUP Reload, seccomp/Landlock Sandbox, Prometheus /metrics & ASAN/UBSan C11 Test Suite.
+          Phase 10–13 PQC, Optical Fabric, QKD, Nanocore, Neural Routing, Photonic Waveguides, Planetary Grid, Self-Healing SIGHUP Reload, seccomp/Landlock Sandbox & Prometheus /metrics,
+          and Phase 14 eBPF SOCKMAP Proxy Pooling, OpenSSL 3.0 SPIFFE mTLS, Hardened Container Mesh & Live Telemetry Dashboard.
         </p>
       </div>
 
