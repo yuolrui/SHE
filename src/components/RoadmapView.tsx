@@ -321,22 +321,43 @@ she_plugin_t *mod_cloud_mesh_plugin_init(void);`,
   {
     phase: 'Phase 15',
     title: 'Autonomous Multi-Region Control Plane & io_uring Zero-Copy',
-    status: 'planned',
-    description: 'Next infrastructure stage: Linux io_uring asynchronous submission/completion ring I/O backend alongside epoll(7), xDS/gRPC dynamic control plane sync across multi-region edge POPs, and eBPF XDP hardware ring telemetry export.',
+    status: 'completed',
+    description: 'Asynchronous kernel ring I/O, global xDS traffic orchestration, and continuous profiling: Linux io_uring SQPOLL submission/completion rings with registered fixed buffers (/uring-status, /uring/submit), Delta-xDS v3 multi-region control plane with dynamic canary weights and circuit breakers (/xds-status, /xds/sync, /xds/canary), and 999Hz eBPF folded-stack flamegraph profiler with Alertmanager threshold evaluator (/profiler-status, /profiler/capture).',
     features: [
-      'she_fdevent io_uring backend option with registered fixed buffers & SQPOLL mode',
-      'xDS dynamic listener/cluster discovery stream for multi-region SHE fleet orchestration',
-      'Automated canary traffic splitting & circuit-breaker outlier detection in mod_proxy_pool',
-      'Live Prometheus Alertmanager webhook sink & flamegraph profiler endpoint',
+      'mod_io_uring: Linux io_uring SQPOLL ring (4096 SQE / 8192 CQE), 256 registered fixed buffers & IORING_OP_SEND_ZC',
+      'mod_xds: Multi-region Delta-xDS v3 sync (us-east-1, us-west-2, eu-central-1, ap-northeast-1) & live canary weight splits',
+      'mod_profiler: 999Hz folded-stack CPU flamegraph capture & Alertmanager webhook threshold evaluation',
+      'TelemetryDashboard UI: Multi-region xDS canary table, io_uring syscall batch savings & folded CPU hotspot bars',
+      'Configuration directives in she.conf: io_uring.*, xds.*, profiler.* + C11 unit & ASAN verification assertions',
     ],
-    codeHighlight: `/* Phase 15 Blueprint: io_uring & Multi-Region xDS Control Plane */
-int she_fdevent_uring_submit_sendfile(she_fdevent_system_t *ev, int fd, off_t offset, size_t len);
-int she_cloud_mesh_sync_xds_snapshot(const char *control_plane_uri);`,
+    codeHighlight: `/* Verified & Active in Phase 15 */
+int she_fdevent_uring_submit_sendfile(int fd, uint64_t offset, uint32_t len, uint64_t *out_cqe_seq);
+int she_cloud_mesh_sync_xds_snapshot(const char *control_plane_uri, uint64_t *out_version);
+int she_xds_set_canary_weight(const char *region_id, uint32_t canary_pct);
+int she_profiler_capture_flamegraph(uint32_t duration_ms, uint64_t *out_samples);
+she_plugin_t *mod_io_uring_plugin_init(void);
+she_plugin_t *mod_xds_plugin_init(void);
+she_plugin_t *mod_profiler_plugin_init(void);`,
+  },
+  {
+    phase: 'Phase 16',
+    title: 'Hardware SmartNIC DPU Offload & Sovereign Zero-Knowledge Attestation',
+    status: 'planned',
+    description: 'Next infrastructure stage: NVIDIA BlueField / DOCA SmartNIC hardware pipeline offload, zk-SNARK zero-knowledge request compliance proofs, and cross-datacenter RDMA RoCEv2 chunkqueue streaming.',
+    features: [
+      'SmartNIC DPU regex WAF & TLS session offload directly on NIC ARM cores',
+      'Zero-knowledge compliance attestation header proofs without revealing tenant PII',
+      'RDMA RoCEv2 zero-copy inter-rack chunkqueue DMA transfers',
+      'Automated chaos fault-injection harness in tests/she_unit_tests.c',
+    ],
+    codeHighlight: `/* Phase 16 Blueprint: SmartNIC DPU & RDMA Chunkqueue */
+int she_dpu_offload_tls_flow(she_connection_t *con, uint32_t nic_flow_id);
+int she_rdma_post_send_chunkqueue(she_chunkqueue_t *cq, uint64_t remote_rkey);`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[13]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[14]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -347,7 +368,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1 through 14 Completed</span>
+          <span>Phase 1 through 15 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -358,8 +379,8 @@ export const RoadmapView: React.FC = () => {
           RFC 7617 Basic Authentication, virtual hosting, FastCGI framing, dynamic Gzip deflate, RFC 6455 WebSocket, OpenSSL TLS 1.3, RFC 9113 HTTP/2,
           WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, gRPC Protobuf Transcoding,
           AI Gateway with Raft Consensus, OpenTelemetry Tracing, DPDK 100GbE Kernel Bypass, eBPF TC Flower, Hardware kTLS Mesh,
-          Phase 10–13 PQC, Optical Fabric, QKD, Nanocore, Neural Routing, Photonic Waveguides, Planetary Grid, Self-Healing SIGHUP Reload, seccomp/Landlock Sandbox & Prometheus /metrics,
-          and Phase 14 eBPF SOCKMAP Proxy Pooling, OpenSSL 3.0 SPIFFE mTLS, Hardened Container Mesh & Live Telemetry Dashboard.
+          Phase 10–14 PQC, Optical Fabric, QKD, Nanocore, Neural Routing, Photonic Waveguides, Planetary Grid, Self-Healing SIGHUP Reload, seccomp/Landlock Sandbox, Prometheus /metrics, eBPF SOCKMAP Proxy Pooling, OpenSSL 3.0 SPIFFE mTLS & Hardened Container Mesh,
+          and Phase 15 Linux io_uring SQPOLL Zero-Copy, Autonomous Multi-Region xDS Canary Control Plane & eBPF Flamegraph Profiler.
         </p>
       </div>
 

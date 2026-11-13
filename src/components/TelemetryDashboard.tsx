@@ -95,6 +95,51 @@ interface CloudMeshSnapshot {
   probes_served: number;
 }
 
+interface IoUringSnapshot {
+  ring_id: string;
+  sq_entries: number;
+  cq_entries: number;
+  registered_fixed_buffers: number;
+  sqpoll_enabled: boolean;
+  submissions_total: number;
+  completions_total: number;
+  zero_copy_send_bytes: number;
+  syscall_batches_saved: number;
+}
+
+interface XdsRegion {
+  region_id: string;
+  endpoint: string;
+  primary_pct: number;
+  canary_pct: number;
+  rtt_ms: number;
+  circuit_open: boolean;
+  routed_requests: number;
+}
+
+interface XdsSnapshot {
+  control_plane_uri: string;
+  snapshot_version: number;
+  nonce: string;
+  sync_count: number;
+  regions: XdsRegion[];
+}
+
+interface ProfilerHotspot {
+  stack: string;
+  samples: number;
+  cpu_pct: number;
+}
+
+interface ProfilerSnapshot {
+  alertmanager_sink: string;
+  alert_state: string;
+  sample_freq_hz: number;
+  total_samples: number;
+  captures_run: number;
+  hotspots: ProfilerHotspot[];
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -144,6 +189,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [proxyPool, setProxyPool] = useState<ProxyPoolSnapshot | null>(null);
   const [mtls, setMtls] = useState<MtlsSnapshot | null>(null);
   const [cloudMesh, setCloudMesh] = useState<CloudMeshSnapshot | null>(null);
+  const [ioUring, setIoUring] = useState<IoUringSnapshot | null>(null);
+  const [xds, setXds] = useState<XdsSnapshot | null>(null);
+  const [profiler, setProfiler] = useState<ProfilerSnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -154,13 +202,16 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
         queryCEngine<ProxyPoolSnapshot>('/proxy-pool-status?json=1'),
         queryCEngine<MtlsSnapshot>('/mtls-status?json=1'),
         queryCEngine<CloudMeshSnapshot>('/cloud-mesh-status'),
+        queryCEngine<IoUringSnapshot>('/uring-status?json=1'),
+        queryCEngine<XdsSnapshot>('/xds-status?json=1'),
+        queryCEngine<ProfilerSnapshot>('/profiler-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -185,6 +236,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (ppRes.data) setProxyPool(ppRes.data);
       if (mtRes.data) setMtls(mtRes.data);
       if (cmRes.data) setCloudMesh(cmRes.data);
+      if (urRes.data) setIoUring(urRes.data);
+      if (xdsRes.data) setXds(xdsRes.data);
+      if (prRes.data) setProfiler(prRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -226,6 +280,26 @@ export const TelemetryDashboard: React.FC = () => {
       if (spliceRes.data && mtlsRes.data) {
         setActionBanner(
           `eBPF SOCKMAP spliced slot #${spliceRes.data.acquired_slot_id} -> ${spliceRes.data.backend} · OpenSSL mTLS verified ${mtlsRes.data.spiffe_id}`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
+  const handleSyncXdsAndProfile = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [xdsSyncRes, uringRes, profRes] = await Promise.all([
+        queryCEngine<{ snapshot_version: number; nonce: string }>('/xds/sync?control_plane=xds://global.she.mesh:18000'),
+        queryCEngine<{ cqe_sequence: number; bytes_submitted: number }>('/uring/submit?bytes=65536&offset=0'),
+        queryCEngine<{ samples_captured: number; alertmanager_state: string }>('/profiler/capture?ms=100'),
+      ]);
+      if (xdsSyncRes.data && uringRes.data && profRes.data) {
+        setActionBanner(
+          `Delta-xDS synced v${xdsSyncRes.data.snapshot_version} (${xdsSyncRes.data.nonce}) · io_uring CQE #${uringRes.data.cqe_sequence} · Profiler +${profRes.data.samples_captured} samples (${profRes.data.alertmanager_state})`
         );
       }
       await fetchAllTelemetry();
@@ -320,6 +394,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <Zap className="w-3.5 h-3.5 fill-current" />
             <span>Probe Splice & mTLS</span>
+          </button>
+
+          <button
+            onClick={handleSyncXdsAndProfile}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-950 bg-purple-400 hover:bg-purple-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Sync xDS & Profile</span>
           </button>
 
           <button
@@ -660,6 +743,104 @@ export const TelemetryDashboard: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Phase 15: Multi-Region xDS Control Plane, io_uring & eBPF Flamegraph Profiler */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                Multi-Region xDS Control Plane & Canary Clusters (mod_xds)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {xds
+                  ? `${xds.control_plane_uri} · Version ${xds.snapshot_version} (${xds.nonce})`
+                  : 'Loading xDS snapshot...'}
+              </p>
+            </div>
+            {ioUring && (
+              <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-emerald-950/60 border border-emerald-800/70 text-emerald-300">
+                io_uring SQ/CQ: {ioUring.sq_entries}/{ioUring.cq_entries} · {formatBytes(ioUring.zero_copy_send_bytes)} ZC
+              </span>
+            )}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2.5 font-medium">Region POP</th>
+                  <th className="px-4 py-2.5 font-medium">Endpoint</th>
+                  <th className="px-4 py-2.5 font-medium">Traffic Split</th>
+                  <th className="px-4 py-2.5 font-medium">RTT</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Routed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(xds?.regions || []).map((reg) => (
+                  <tr key={reg.region_id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2.5 text-emerald-400 font-bold">{reg.region_id}</td>
+                    <td className="px-4 py-2.5 text-slate-300">{reg.endpoint}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-slate-200">{reg.primary_pct}%</span>
+                      <span className="text-slate-500"> / </span>
+                      <span className="text-purple-300">{reg.canary_pct}% canary</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-sky-300 tabular-nums">{reg.rtt_ms}ms</td>
+                    <td className="px-4 py-2.5 text-right text-slate-200 tabular-nums">
+                      {reg.routed_requests.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">eBPF Flamegraph Hotspots (mod_profiler)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {profiler
+                  ? `${profiler.total_samples.toLocaleString()} samples @ ${profiler.sample_freq_hz} Hz · ${profiler.alert_state}`
+                  : 'Loading CPU stack profile...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+              {profiler?.alert_state || 'OK'}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {(profiler?.hotspots || []).map((hs) => (
+              <div key={hs.stack} className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-slate-300 truncate max-w-[290px]" title={hs.stack}>
+                    {hs.stack}
+                  </span>
+                  <span className="text-emerald-400 font-bold tabular-nums">{hs.cpu_pct.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded bg-slate-950 border border-slate-800 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-sky-400 transition-all"
+                    style={{ width: `${Math.min(100, hs.cpu_pct)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {ioUring && (
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
+              <span>io_uring Syscall Batches Saved</span>
+              <span className="text-emerald-300 font-bold tabular-nums">
+                {ioUring.syscall_batches_saved.toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

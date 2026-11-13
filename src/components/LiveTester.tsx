@@ -628,6 +628,54 @@ const PRESETS = [
     desc: 'Kubernetes liveness/readiness probe controller reporting live C11 plugin count and active connections.',
   },
   {
+    name: 'io_uring Ring Telemetry (/uring-status)',
+    category: 'Phase 15',
+    method: 'GET',
+    path: '/uring-status?json=1',
+    headers: {},
+    desc: 'Inspects Linux io_uring SQPOLL ring depth (4096 SQE / 8192 CQE), registered fixed buffers, and zero-copy bytes.',
+  },
+  {
+    name: 'io_uring Zero-Copy SQE (/uring/submit)',
+    category: 'Phase 15',
+    method: 'GET',
+    path: '/uring/submit?bytes=65536&offset=0',
+    headers: {},
+    desc: 'Submits a 64KB IORING_OP_SEND_ZC zero-copy SQE entry and returns the CQE completion sequence number.',
+  },
+  {
+    name: 'Multi-Region xDS Status (/xds-status)',
+    category: 'Phase 15',
+    method: 'GET',
+    path: '/xds-status?json=1',
+    headers: {},
+    desc: 'Inspects Delta-xDS v3 snapshot version, global POP clusters, canary traffic splits, and circuit-breaker states.',
+  },
+  {
+    name: 'Sync xDS Snapshot (/xds/sync)',
+    category: 'Phase 15',
+    method: 'GET',
+    path: '/xds/sync?control_plane=xds://global.she.mesh:18000',
+    headers: {},
+    desc: 'Synchronizes LDS/RDS/CDS/EDS resources from the multi-region xDS control plane and increments snapshot version.',
+  },
+  {
+    name: 'eBPF Flamegraph Profiler (/profiler-status)',
+    category: 'Phase 15',
+    method: 'GET',
+    path: '/profiler-status?json=1',
+    headers: {},
+    desc: 'Returns 999Hz folded-stack CPU flamegraph hotspots and Alertmanager webhook rule evaluation state.',
+  },
+  {
+    name: 'Capture CPU Flamegraph (/profiler/capture)',
+    category: 'Phase 15',
+    method: 'GET',
+    path: '/profiler/capture?ms=100',
+    headers: {},
+    desc: 'Captures a 100ms eBPF stack sample burst (1,000 samples) and evaluates live Alertmanager thresholds.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -918,7 +966,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 14)
+            SHE Production Engine Presets (Phases 1 - 15)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

@@ -16,6 +16,9 @@
 #include "modules/mod_sandbox.h"
 #include "modules/mod_proxy_pool.h"
 #include "modules/mod_mtls.h"
+#include "modules/mod_io_uring.h"
+#include "modules/mod_xds.h"
+#include "modules/mod_profiler.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -137,6 +140,23 @@ static void test_config_loader_and_plugins(void) {
     SHE_TEST_ASSERT(she_ssl_verify_mtls_client_cert("spiffe://she.mesh/ns/prod/sa/api", fp, sizeof(fp)) == 0, "valid SPIFFE ID verified");
     SHE_TEST_ASSERT(strlen(fp) == 64, "mTLS SHA-256 fingerprint is 64 hex chars");
     SHE_TEST_ASSERT(she_ssl_verify_mtls_client_cert("spiffe://untrusted.org/evil", fp, sizeof(fp)) != 0, "untrusted SPIFFE domain rejected");
+
+    uint64_t cqe_seq = 0;
+    SHE_TEST_ASSERT(she_fdevent_uring_submit_sendfile(1, 0, 65536U, &cqe_seq) == 0, "io_uring sendfile SQE succeeds");
+    SHE_TEST_ASSERT(cqe_seq > 0ULL, "io_uring returns valid CQE completion sequence");
+
+    uint64_t xds_ver = 0;
+    SHE_TEST_ASSERT(she_cloud_mesh_sync_xds_snapshot("xds://global.she.mesh:18000", &xds_ver) == 0, "xDS delta snapshot sync succeeds");
+    SHE_TEST_ASSERT(xds_ver > 0ULL, "xDS snapshot version incremented");
+    SHE_TEST_ASSERT(she_xds_set_canary_weight("eu-central-1", 30U) == 0, "xDS canary weight updated for valid region");
+    SHE_TEST_ASSERT(she_xds_set_canary_weight("nonexistent-region", 10U) != 0, "xDS rejects unknown region");
+
+    uint64_t samples = 0;
+    char alert_st[32] = {0};
+    SHE_TEST_ASSERT(she_profiler_capture_flamegraph(100U, &samples) == 0, "flamegraph capture succeeds");
+    SHE_TEST_ASSERT(samples == 1000ULL, "100ms capture yields 1000 samples");
+    SHE_TEST_ASSERT(she_profiler_evaluate_alerts(NULL, alert_st, sizeof(alert_st)) == 0, "alertmanager evaluator runs cleanly");
+    SHE_TEST_ASSERT(strcmp(alert_st, "OK_NOMINAL") == 0, "nominal alert state confirmed");
 }
 
 int main(void) {
