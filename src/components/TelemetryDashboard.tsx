@@ -140,6 +140,49 @@ interface ProfilerSnapshot {
   hotspots: ProfilerHotspot[];
 }
 
+interface DpuFlow {
+  flow_id: number;
+  policy: string;
+  packets: number;
+  hw_active: boolean;
+}
+
+interface DpuSnapshot {
+  dpu_device: string;
+  arm_cores: number;
+  waf_regex_rules: number;
+  total_flows_offloaded: number;
+  total_packets_fastpathed: number;
+  flows: DpuFlow[];
+}
+
+interface ZkSnapshot {
+  circuit_id: string;
+  curve: string;
+  proofs_generated: number;
+  proofs_verified: number;
+  avg_verify_us: number;
+  last_claim: string;
+  last_commitment_hex: string;
+}
+
+interface RdmaQp {
+  qp_num: number;
+  remote_rack: string;
+  remote_rkey: string;
+  dma_bytes: number;
+  wr_posted: number;
+}
+
+interface RdmaSnapshot {
+  hca_device: string;
+  transport: string;
+  link_gbps: number;
+  total_wr_completed: number;
+  total_dma_bytes: number;
+  qps: RdmaQp[];
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -192,6 +235,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [ioUring, setIoUring] = useState<IoUringSnapshot | null>(null);
   const [xds, setXds] = useState<XdsSnapshot | null>(null);
   const [profiler, setProfiler] = useState<ProfilerSnapshot | null>(null);
+  const [dpu, setDpu] = useState<DpuSnapshot | null>(null);
+  const [zk, setZk] = useState<ZkSnapshot | null>(null);
+  const [rdma, setRdma] = useState<RdmaSnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -202,7 +248,7 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
@@ -212,6 +258,9 @@ export const TelemetryDashboard: React.FC = () => {
         queryCEngine<IoUringSnapshot>('/uring-status?json=1'),
         queryCEngine<XdsSnapshot>('/xds-status?json=1'),
         queryCEngine<ProfilerSnapshot>('/profiler-status?json=1'),
+        queryCEngine<DpuSnapshot>('/dpu-status?json=1'),
+        queryCEngine<ZkSnapshot>('/zk-status?json=1'),
+        queryCEngine<RdmaSnapshot>('/rdma-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -239,6 +288,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (urRes.data) setIoUring(urRes.data);
       if (xdsRes.data) setXds(xdsRes.data);
       if (prRes.data) setProfiler(prRes.data);
+      if (dpuRes.data) setDpu(dpuRes.data);
+      if (zkRes.data) setZk(zkRes.data);
+      if (rdmaRes.data) setRdma(rdmaRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -300,6 +352,26 @@ export const TelemetryDashboard: React.FC = () => {
       if (xdsSyncRes.data && uringRes.data && profRes.data) {
         setActionBanner(
           `Delta-xDS synced v${xdsSyncRes.data.snapshot_version} (${xdsSyncRes.data.nonce}) · io_uring CQE #${uringRes.data.cqe_sequence} · Profiler +${profRes.data.samples_captured} samples (${profRes.data.alertmanager_state})`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
+  const handleRunDpuZkRdma = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [dpuRes, zkRes, rdmaRes] = await Promise.all([
+        queryCEngine<{ nic_flow_id: number; total_flows_offloaded: number }>('/dpu/offload?flow_id=1024&policy=strict-waf'),
+        queryCEngine<{ zk_commitment_sha256: string; verify_time_us: number }>('/zk/prove?claim=eu-gdpr-sovereign-tenant'),
+        queryCEngine<{ qp_num: number; dma_bytes_posted: number }>('/rdma/post-send?qp=201&bytes=1048576'),
+      ]);
+      if (dpuRes.data && zkRes.data && rdmaRes.data) {
+        setActionBanner(
+          `DOCA Flow #${dpuRes.data.nic_flow_id} offloaded · Groth16 ZK proved (${zkRes.data.verify_time_us}us) · RDMA QP#${rdmaRes.data.qp_num} DMA +${formatBytes(rdmaRes.data.dma_bytes_posted)}`
         );
       }
       await fetchAllTelemetry();
@@ -403,6 +475,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <Activity className="w-3.5 h-3.5" />
             <span>Sync xDS & Profile</span>
+          </button>
+
+          <button
+            onClick={handleRunDpuZkRdma}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span>DPU · ZK · RDMA</span>
           </button>
 
           <button
@@ -841,6 +922,92 @@ export const TelemetryDashboard: React.FC = () => {
               </span>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Phase 16: Hardware SmartNIC DPU, Zero-Knowledge Attestation & RDMA RoCEv2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                SmartNIC DPU Offload & ZK Compliance (mod_dpu_offload + mod_zk_attest)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {dpu ? `${dpu.dpu_device} · ${dpu.arm_cores} ARM cores · ${dpu.waf_regex_rules} WAF regex rules` : 'Loading DPU telemetry...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+              {dpu ? `${dpu.total_flows_offloaded.toLocaleString()} HW Flows` : '--'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">Packets HW-Fastpathed</span>
+              <div className="text-base font-bold text-emerald-400 tabular-nums">
+                {dpu ? dpu.total_packets_fastpathed.toLocaleString() : '--'}
+              </div>
+            </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">ZK Proofs Verified ({zk?.avg_verify_us ?? 0} us)</span>
+              <div className="text-base font-bold text-sky-400 tabular-nums">
+                {zk ? zk.proofs_verified.toLocaleString() : '--'}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5 text-xs font-mono">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Circuit / Claim</span>
+              <span className="text-purple-300">{zk ? `${zk.circuit_id} · ${zk.last_claim}` : '--'}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">SHA-256 Commitment</span>
+              <span className="text-emerald-300 truncate" title={zk?.last_commitment_hex}>
+                {zk?.last_commitment_hex || '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">RDMA RoCEv2 Cross-Rack DMA (mod_rdma)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {rdma ? `${rdma.hca_device} · ${rdma.transport} @ ${rdma.link_gbps} Gbps` : 'Loading RDMA HCA...'}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-emerald-300 font-bold tabular-nums">
+              {rdma ? `${formatBytes(rdma.total_dma_bytes)} DMA` : '--'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2 font-medium">QP</th>
+                  <th className="px-4 py-2 font-medium">Remote Rack</th>
+                  <th className="px-4 py-2 font-medium">Remote Key</th>
+                  <th className="px-4 py-2 font-medium text-right">WRs</th>
+                  <th className="px-4 py-2 font-medium text-right">DMA Sent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rdma?.qps || []).map((qp) => (
+                  <tr key={qp.qp_num} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2 text-amber-300 font-bold">#{qp.qp_num}</td>
+                    <td className="px-4 py-2 text-slate-200">{qp.remote_rack}</td>
+                    <td className="px-4 py-2 text-slate-400">{qp.remote_rkey}</td>
+                    <td className="px-4 py-2 text-right text-slate-300 tabular-nums">{qp.wr_posted.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right text-emerald-300 tabular-nums">{formatBytes(qp.dma_bytes)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -19,6 +19,9 @@
 #include "modules/mod_io_uring.h"
 #include "modules/mod_xds.h"
 #include "modules/mod_profiler.h"
+#include "modules/mod_dpu_offload.h"
+#include "modules/mod_zk_attest.h"
+#include "modules/mod_rdma.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -157,6 +160,21 @@ static void test_config_loader_and_plugins(void) {
     SHE_TEST_ASSERT(samples == 1000ULL, "100ms capture yields 1000 samples");
     SHE_TEST_ASSERT(she_profiler_evaluate_alerts(NULL, alert_st, sizeof(alert_st)) == 0, "alertmanager evaluator runs cleanly");
     SHE_TEST_ASSERT(strcmp(alert_st, "OK_NOMINAL") == 0, "nominal alert state confirmed");
+
+    uint64_t offloaded_flows = 0;
+    SHE_TEST_ASSERT(she_dpu_offload_tls_flow(1024U, "strict-waf", &offloaded_flows) == 0, "DPU HW flow offload succeeds");
+    SHE_TEST_ASSERT(offloaded_flows > 0ULL, "DPU offloaded flows counter incremented");
+    SHE_TEST_ASSERT(she_dpu_offload_tls_flow(0U, "", &offloaded_flows) != 0, "chaos: DPU rejects invalid flow_id=0");
+
+    char zk_commit[65] = {0};
+    uint32_t verify_us = 0;
+    SHE_TEST_ASSERT(she_zk_generate_compliance_proof("eu-gdpr-sovereign", zk_commit, sizeof(zk_commit), &verify_us) == 0, "ZK compliance proof generated");
+    SHE_TEST_ASSERT(strlen(zk_commit) == 64, "ZK commitment is 64-char SHA-256 hex");
+    SHE_TEST_ASSERT(verify_us > 0U && verify_us < 1000U, "ZK verification under 1ms");
+    SHE_TEST_ASSERT(she_zk_generate_compliance_proof("", zk_commit, sizeof(zk_commit), &verify_us) != 0, "chaos: ZK rejects empty claim");
+
+    SHE_TEST_ASSERT(she_rdma_post_send_chunkqueue(201U, 0x7A000010ULL, 1048576ULL) == 0, "RDMA RoCEv2 post-send succeeds");
+    SHE_TEST_ASSERT(she_rdma_post_send_chunkqueue(0U, 0ULL, 0ULL) != 0, "chaos: RDMA rejects zero qp_num/bytes");
 }
 
 int main(void) {

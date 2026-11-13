@@ -676,6 +676,54 @@ const PRESETS = [
     desc: 'Captures a 100ms eBPF stack sample burst (1,000 samples) and evaluates live Alertmanager thresholds.',
   },
   {
+    name: 'SmartNIC DPU Offload Status (/dpu-status)',
+    category: 'Phase 16',
+    method: 'GET',
+    path: '/dpu-status?json=1',
+    headers: {},
+    desc: 'Inspects BlueField-3 DOCA SmartNIC hardware flow table, 1280 regex WAF rules, and fastpath packet counters.',
+  },
+  {
+    name: 'Install DPU Hardware Flow (/dpu/offload)',
+    category: 'Phase 16',
+    method: 'GET',
+    path: '/dpu/offload?flow_id=1024&policy=strict-waf',
+    headers: {},
+    desc: 'Installs a hardware TLS + Regex WAF flow rule directly onto the SmartNIC DPU ARM pipeline.',
+  },
+  {
+    name: 'ZK Compliance Status (/zk-status)',
+    category: 'Phase 16',
+    method: 'GET',
+    path: '/zk-status?json=1',
+    headers: {},
+    desc: 'Inspects Groth16 BN254 zero-knowledge compliance proof circuit metrics and latest SHA-256 commitment.',
+  },
+  {
+    name: 'Generate ZK Attestation Proof (/zk/prove)',
+    category: 'Phase 16',
+    method: 'GET',
+    path: '/zk/prove?claim=eu-gdpr-sovereign-tenant',
+    headers: {},
+    desc: 'Generates a sovereign zero-knowledge compliance proof commitment without disclosing tenant PII.',
+  },
+  {
+    name: 'RDMA RoCEv2 DMA Status (/rdma-status)',
+    category: 'Phase 16',
+    method: 'GET',
+    path: '/rdma-status?json=1',
+    headers: {},
+    desc: 'Inspects mlx5_0 400G RoCEv2 HCA Queue Pairs, remote memory keys, and cross-rack DMA throughput.',
+  },
+  {
+    name: 'Post RDMA Chunkqueue DMA (/rdma/post-send)',
+    category: 'Phase 16',
+    method: 'GET',
+    path: '/rdma/post-send?qp=201&bytes=1048576',
+    headers: {},
+    desc: 'Posts a 1MB zero-copy IBV_WR_RDMA_WRITE Work Request on Queue Pair #201 across the rack fabric.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -966,7 +1014,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 15)
+            SHE Production Engine Presets (Phases 1 - 16)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>
