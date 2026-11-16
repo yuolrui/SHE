@@ -380,21 +380,39 @@ int she_formal_run_proof_suite(uint32_t *out_checked, uint32_t *out_violations);
   {
     phase: 'Phase 18',
     title: 'Autonomous Multi-Cluster Self-Evolving Mesh & Full eBPF XDP Offload',
-    status: 'planned',
-    description: 'Next infrastructure horizon: Cross-cloud autonomous topology federation, zero-copy XDP/AF_XDP socket fastpath bridging, and declarative policy-as-code admission gates.',
+    status: 'completed',
+    description: 'Cross-cloud autonomous topology federation, zero-copy AF_XDP user-space UMEM ring bridging, and end-to-end deterministic request/FSM replay tracing for reproducible post-mortem verification.',
     features: [
-      'AF_XDP zero-copy user-space ring bridge with UMEM descriptor recycling',
-      'Cross-cluster Raft-backed policy federation and autonomous SLA failover',
-      'End-to-end deterministic replay tracer for reproducible post-mortem debugging',
+      'mod_afxdp: AF_XDP zero-copy user-space ring bridge with 16,384 registered 4K UMEM frames (/afxdp-status, /afxdp/bind)',
+      'mod_federation: Cross-cluster Raft policy epoch synchronization & SHA-256 digest verification (/federation-status, /federation/sync)',
+      'mod_replay: Deterministic FNV1a-64 request/FSM trace ring hooked into handle_response_done (/replay-status, /replay/verify)',
+      'C11 & Chaos Verification: 79 formal assertions verified under Release -O2 and ASan/UBSan/LSan gates',
+      'TelemetryDashboard UI: Real-time AF_XDP queue stats, federated cluster SLA table & replay trace verification',
     ],
-    codeHighlight: `/* Phase 18 Blueprint: AF_XDP Fastpath & Federated Policy Mesh */
-int she_afxdp_bind_umem_ring(const char *ifname, uint32_t queue_id);
-int she_federation_sync_policy(const char *cluster_id, const char *policy_digest);`,
+    codeHighlight: `/* Verified & Active in Phase 18 */
+int she_afxdp_bind_umem_ring(const char *ifname, uint32_t queue_id, uint64_t *out_umem_frames);
+int she_federation_sync_policy(const char *cluster_id, const char *policy_digest, uint64_t *out_epoch);
+int she_replay_record_event(const char *method, const char *path, int status, uint64_t *out_seq);
+int she_replay_verify_trace(uint64_t seq, char *out_checksum, size_t chk_sz);`,
+  },
+  {
+    phase: 'Phase 19',
+    title: 'Confidential Computing Enclaves & Neuromorphic Edge Dispatch',
+    status: 'planned',
+    description: 'Next infrastructure horizon: Hardware-isolated AMD SEV-SNP / Intel TDX confidential compute attestation, neuromorphic spike-timing anomaly detection, and zero-trust confidential TLS termination.',
+    features: [
+      'AMD SEV-SNP / Intel TDX remote hardware enclave attestation quotes',
+      'Neuromorphic spike-timing event-driven L7 anomaly classifier',
+      'Hardware-sealed ephemeral TLS session key enclave vault',
+    ],
+    codeHighlight: `/* Phase 19 Blueprint: Confidential Enclave & Neuromorphic Edge */
+int she_enclave_verify_quote(const uint8_t *report, size_t len);
+int she_neuro_classify_spike(uint32_t flow_id, uint32_t isi_us);`,
   },
 ];
 
 export const RoadmapView: React.FC = () => {
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[16]);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone>(MILESTONES[17]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -405,7 +423,7 @@ export const RoadmapView: React.FC = () => {
           <span aria-hidden="true">·</span>
           <span>Lighttpd Architecture & Security Parity</span>
           <span aria-hidden="true">·</span>
-          <span>Phase 1 through 17 Completed</span>
+          <span>Phase 1 through 18 Completed</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE (Secure HTTP Engine) Milestone Roadmap
@@ -417,7 +435,8 @@ export const RoadmapView: React.FC = () => {
           WASM 1.0 Serverless Edge, eBPF/XDP Kernel Shield, RFC 8555 ACME automated certificates, RFC 9000 QUIC, RFC 9114 HTTP/3, WireGuard Zero-Trust Mesh, gRPC Protobuf Transcoding,
           AI Gateway with Raft Consensus, OpenTelemetry Tracing, DPDK 100GbE Kernel Bypass, eBPF TC Flower, Hardware kTLS Mesh,
           Phase 10–15 PQC, Optical Fabric, QKD, Nanocore, Neural Routing, Photonic Waveguides, Planetary Grid, Self-Healing SIGHUP Reload, seccomp/Landlock Sandbox, Prometheus /metrics, eBPF SOCKMAP Proxy Pooling, OpenSSL 3.0 SPIFFE mTLS, Hardened Container Mesh, Linux io_uring SQPOLL, Delta-xDS Control Plane & eBPF Flamegraph Profiler,
-          Phase 16 SmartNIC DPU Offload, Sovereign ZK Attestation & 400G RoCEv2 RDMA, and Phase 17 3.2 Tbps Co-Packaged Optics, BBRv3 Neural Pacing & Formal FSM Proof Kernel.
+          Phase 16–17 SmartNIC DPU Offload, Sovereign ZK Attestation, 400G RoCEv2 RDMA, 3.2 Tbps Co-Packaged Optics, BBRv3 Neural Pacing & Formal FSM Proof Kernel,
+          and Phase 18 AF_XDP UMEM Zero-Copy, Multi-Cluster Policy Federation & Deterministic Replay Tracing.
         </p>
       </div>
 

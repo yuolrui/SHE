@@ -228,6 +228,55 @@ interface FormalSnapshot {
   last_proof_digest: string;
 }
 
+interface AfxdpRing {
+  ifname: string;
+  queue_id: number;
+  umem_frames: number;
+  rx_packets: number;
+  tx_packets: number;
+  recycled: number;
+  zero_copy: boolean;
+}
+
+interface AfxdpSnapshot {
+  mode: string;
+  frame_size: number;
+  total_umem_frames: number;
+  total_zero_copy_pkts: number;
+  rings: AfxdpRing[];
+}
+
+interface FedCluster {
+  cluster_id: string;
+  region: string;
+  status: string;
+  sla_ms: number;
+  epoch: number;
+  policy_digest: string;
+}
+
+interface FederationSnapshot {
+  mesh_id: string;
+  global_epoch: number;
+  failovers_executed: number;
+  clusters: FedCluster[];
+}
+
+interface ReplayEvent {
+  seq: number;
+  method: string;
+  path: string;
+  status: number;
+  trace_hash: string;
+}
+
+interface ReplaySnapshot {
+  engine_name: string;
+  events_recorded: number;
+  replays_verified: number;
+  recent_events: ReplayEvent[];
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -286,6 +335,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [cpo, setCpo] = useState<CpoSnapshot | null>(null);
   const [bbr, setBbr] = useState<BbrSnapshot | null>(null);
   const [formal, setFormal] = useState<FormalSnapshot | null>(null);
+  const [afxdp, setAfxdp] = useState<AfxdpSnapshot | null>(null);
+  const [federation, setFederation] = useState<FederationSnapshot | null>(null);
+  const [replay, setReplay] = useState<ReplaySnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -296,7 +348,7 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
@@ -312,6 +364,9 @@ export const TelemetryDashboard: React.FC = () => {
         queryCEngine<CpoSnapshot>('/cpo-status?json=1'),
         queryCEngine<BbrSnapshot>('/bbr-status?json=1'),
         queryCEngine<FormalSnapshot>('/formal-status?json=1'),
+        queryCEngine<AfxdpSnapshot>('/afxdp-status?json=1'),
+        queryCEngine<FederationSnapshot>('/federation-status?json=1'),
+        queryCEngine<ReplaySnapshot>('/replay-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -345,6 +400,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (cpoRes.data) setCpo(cpoRes.data);
       if (bbrRes.data) setBbr(bbrRes.data);
       if (fmRes.data) setFormal(fmRes.data);
+      if (afxRes.data) setAfxdp(afxRes.data);
+      if (fedRes.data) setFederation(fedRes.data);
+      if (repRes.data) setReplay(repRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -446,6 +504,26 @@ export const TelemetryDashboard: React.FC = () => {
       if (cpoRes.data && bbrRes.data && fmRes.data) {
         setActionBanner(
           `CPO Lane #${cpoRes.data.lane_id} tuned (${cpoRes.data.aggregate_gbps} Gbps) · BBRv3 ${bbrRes.data.phase} (${(bbrRes.data.pacing_rate_bps / 1e9).toFixed(1)} Gbps) · Formal FSM ${fmRes.data.status} (${fmRes.data.rules_verified} rules, ${fmRes.data.violations_detected} violations)`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
+  const handleRunAfxdpFedReplay = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [afxRes, fedRes, repRes] = await Promise.all([
+        queryCEngine<{ ifname: string; queue_id: number; umem_frames: number }>('/afxdp/bind?ifname=eth0&queue=0'),
+        queryCEngine<{ cluster_id: string; global_epoch: number }>('/federation/sync?cluster=eu-west-mesh&policy=zero-trust-strict'),
+        queryCEngine<{ seq_verified: number; deterministic_hash: string }>('/replay/verify'),
+      ]);
+      if (afxRes.data && fedRes.data && repRes.data) {
+        setActionBanner(
+          `AF_XDP ${afxRes.data.ifname}:Q${afxRes.data.queue_id} (${afxRes.data.umem_frames} UMEM frames) · Federation ${fedRes.data.cluster_id} Epoch #${fedRes.data.global_epoch} · Replay #${repRes.data.seq_verified} (${repRes.data.deterministic_hash})`
         );
       }
       await fetchAllTelemetry();
@@ -567,6 +645,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>CPO · BBRv3 · Formal</span>
+          </button>
+
+          <button
+            onClick={handleRunAfxdpFedReplay}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-950 bg-indigo-400 hover:bg-indigo-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Network className="w-3.5 h-3.5" />
+            <span>AF_XDP · Fed · Replay</span>
           </button>
 
           <button
@@ -1179,6 +1266,89 @@ export const TelemetryDashboard: React.FC = () => {
                     <td className="px-4 py-2 text-right text-slate-300 tabular-nums">{fl.pacing_gain.toFixed(2)}x</td>
                     <td className="px-4 py-2 text-right text-emerald-300 tabular-nums">
                       {(fl.pacing_rate_bps / 1e9).toFixed(1)} Gbps
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 18: AF_XDP UMEM Zero-Copy, Multi-Cluster Federation & Deterministic Replay */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                AF_XDP UMEM Ring & Replay Tracer (mod_afxdp + mod_replay)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {afxdp ? `${afxdp.mode} · ${afxdp.total_umem_frames.toLocaleString()} frames · ${afxdp.total_zero_copy_pkts.toLocaleString()} ZC pkts` : 'Loading AF_XDP UMEM...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+              {replay ? `${replay.events_recorded} Traced` : '--'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">AF_XDP Zero-Copy Rings</span>
+              <div className="text-base font-bold text-indigo-300 tabular-nums">
+                {afxdp ? `${afxdp.rings.length} Active Queues` : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {afxdp ? `${afxdp.frame_size}B aligned UMEM frames` : ''}
+              </span>
+            </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">Deterministic Replays Verified</span>
+              <div className="text-base font-bold text-emerald-400 tabular-nums">
+                {replay ? replay.replays_verified.toLocaleString() : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {replay?.recent_events?.[replay.recent_events.length - 1]
+                  ? `Latest: ${replay.recent_events[replay.recent_events.length - 1].path}`
+                  : 'FNV1a-64 trace ring'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">Multi-Cluster Policy Federation (mod_federation)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {federation ? `${federation.mesh_id} · Global Epoch #${federation.global_epoch}` : 'Loading Federation mesh...'}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-indigo-300 font-bold tabular-nums">
+              {federation ? `${federation.failovers_executed} failovers` : '--'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2 font-medium">Cluster</th>
+                  <th className="px-4 py-2 font-medium">Region</th>
+                  <th className="px-4 py-2 font-medium">SLA</th>
+                  <th className="px-4 py-2 font-medium">Epoch</th>
+                  <th className="px-4 py-2 font-medium">SHA-256 Policy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(federation?.clusters || []).map((cl) => (
+                  <tr key={cl.cluster_id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2 text-indigo-300 font-bold">{cl.cluster_id}</td>
+                    <td className="px-4 py-2 text-slate-200">{cl.region}</td>
+                    <td className="px-4 py-2 text-emerald-400 tabular-nums">{cl.sla_ms}ms</td>
+                    <td className="px-4 py-2 text-slate-300 tabular-nums">#{cl.epoch}</td>
+                    <td className="px-4 py-2 text-slate-400 truncate max-w-[140px]" title={cl.policy_digest}>
+                      {cl.policy_digest}
                     </td>
                   </tr>
                 ))}

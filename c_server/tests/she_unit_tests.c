@@ -25,6 +25,9 @@
 #include "modules/mod_cpo.h"
 #include "modules/mod_bbrv3.h"
 #include "modules/mod_formal_fsm.h"
+#include "modules/mod_afxdp.h"
+#include "modules/mod_federation.h"
+#include "modules/mod_replay.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -194,6 +197,22 @@ static void test_config_loader_and_plugins(void) {
     SHE_TEST_ASSERT(she_formal_run_proof_suite(&formal_checked, &formal_violations) == 0, "Formal FSM proof suite verifies all states");
     SHE_TEST_ASSERT(formal_checked == 6U && formal_violations == 0U, "Formal FSM reports 6 verified rules and 0 violations");
     SHE_TEST_ASSERT(she_fsm_verify_invariant(NULL) != 0, "chaos: Formal FSM catches NULL connection invariant");
+
+    uint64_t umem_frames = 0ULL;
+    SHE_TEST_ASSERT(she_afxdp_bind_umem_ring("eth0", 0U, &umem_frames) == 0, "AF_XDP binds eth0 queue 0 UMEM cleanly");
+    SHE_TEST_ASSERT(umem_frames == 16384ULL, "AF_XDP reports 16384 registered UMEM frames");
+    SHE_TEST_ASSERT(she_afxdp_bind_umem_ring("", 99U, &umem_frames) != 0, "chaos: AF_XDP rejects empty ifname / out-of-range queue");
+
+    uint64_t fed_epoch = 0ULL;
+    SHE_TEST_ASSERT(she_federation_sync_policy("eu-west-mesh", "zero-trust-strict", &fed_epoch) == 0, "Federation syncs eu-west-mesh policy");
+    SHE_TEST_ASSERT(fed_epoch > 1042ULL, "Federation increments global Raft policy epoch");
+    SHE_TEST_ASSERT(she_federation_sync_policy("unknown-cluster", "p", &fed_epoch) != 0, "chaos: Federation rejects unknown cluster_id");
+
+    uint64_t replay_seq = 0ULL;
+    char replay_chk[17] = {0};
+    SHE_TEST_ASSERT(she_replay_record_event("GET", "/federation-status", 200, &replay_seq) == 0, "Replay tracer records event cleanly");
+    SHE_TEST_ASSERT(she_replay_verify_trace(replay_seq, replay_chk, sizeof(replay_chk)) == 0 && strlen(replay_chk) == 16, "Replay verifies deterministic 16-hex hash");
+    SHE_TEST_ASSERT(she_replay_verify_trace(0ULL, replay_chk, sizeof(replay_chk)) != 0, "chaos: Replay rejects invalid seq=0");
 }
 
 int main(void) {

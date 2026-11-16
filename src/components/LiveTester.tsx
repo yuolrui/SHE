@@ -772,6 +772,54 @@ const PRESETS = [
     desc: 'Runs live 6-state she_connection_t FSM invariant proof suite and emits QED SHA-256 digest.',
   },
   {
+    name: 'AF_XDP UMEM Status (/afxdp-status)',
+    category: 'Phase 18',
+    method: 'GET',
+    path: '/afxdp-status?json=1',
+    headers: {},
+    desc: 'Inspects AF_XDP zero-copy user-space rings, 4K UMEM frames, and recycled zero-copy packet counts.',
+  },
+  {
+    name: 'Bind AF_XDP UMEM Ring (/afxdp/bind)',
+    category: 'Phase 18',
+    method: 'GET',
+    path: '/afxdp/bind?ifname=eth0&queue=0',
+    headers: {},
+    desc: 'Binds 4,096 UMEM descriptors to eth0 RX/TX Queue #0 in XDP_ZEROCOPY mode.',
+  },
+  {
+    name: 'Federation Mesh Status (/federation-status)',
+    category: 'Phase 18',
+    method: 'GET',
+    path: '/federation-status?json=1',
+    headers: {},
+    desc: 'Inspects multi-cluster Raft-backed policy epochs, SLA latencies, and SHA-256 policy digests.',
+  },
+  {
+    name: 'Sync Federated Policy (/federation/sync)',
+    category: 'Phase 18',
+    method: 'GET',
+    path: '/federation/sync?cluster=eu-west-mesh&policy=zero-trust-strict',
+    headers: {},
+    desc: 'Commits declarative zero-trust policy update to eu-west-mesh and increments global Raft epoch.',
+  },
+  {
+    name: 'Replay Tracer Status (/replay-status)',
+    category: 'Phase 18',
+    method: 'GET',
+    path: '/replay-status?json=1',
+    headers: {},
+    desc: 'Inspects deterministic HTTP/FSM trace ring buffer and FNV1a-64 replay hashes.',
+  },
+  {
+    name: 'Verify Deterministic Replay (/replay/verify)',
+    category: 'Phase 18',
+    method: 'GET',
+    path: '/replay/verify',
+    headers: {},
+    desc: 'Recomputes deterministic FNV1a-64 execution checksum on the latest captured request frame.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -1062,7 +1110,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 17)
+            SHE Production Engine Presets (Phases 1 - 18)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>
