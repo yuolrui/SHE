@@ -22,6 +22,9 @@
 #include "modules/mod_dpu_offload.h"
 #include "modules/mod_zk_attest.h"
 #include "modules/mod_rdma.h"
+#include "modules/mod_cpo.h"
+#include "modules/mod_bbrv3.h"
+#include "modules/mod_formal_fsm.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -175,6 +178,22 @@ static void test_config_loader_and_plugins(void) {
 
     SHE_TEST_ASSERT(she_rdma_post_send_chunkqueue(201U, 0x7A000010ULL, 1048576ULL) == 0, "RDMA RoCEv2 post-send succeeds");
     SHE_TEST_ASSERT(she_rdma_post_send_chunkqueue(0U, 0ULL, 0ULL) != 0, "chaos: RDMA rejects zero qp_num/bytes");
+
+    uint64_t cpo_gbps = 0ULL;
+    SHE_TEST_ASSERT(she_cpo_tune_optical_lane(1U, -2, &cpo_gbps) == 0, "CPO optical lane 1 tunes cleanly");
+    SHE_TEST_ASSERT(cpo_gbps == 3200ULL, "CPO 8x400G aggregate equals 3200 Gbps");
+    SHE_TEST_ASSERT(she_cpo_tune_optical_lane(99U, 20, &cpo_gbps) != 0, "chaos: CPO rejects out-of-range lane/power");
+
+    uint64_t pacing_bps = 0ULL;
+    SHE_TEST_ASSERT(she_bbrv3_pace_flow(101U, 180U, 40000U, &pacing_bps) == 0, "BBRv3 neural pacer succeeds");
+    SHE_TEST_ASSERT(pacing_bps == 50000000000ULL, "BBRv3 ProbeBW UP applies 1.25x gain on 40Gbps");
+    SHE_TEST_ASSERT(she_bbrv3_pace_flow(0U, 0U, 0U, &pacing_bps) != 0, "chaos: BBRv3 rejects zero flow/rtt/bw");
+
+    uint32_t formal_checked = 0U;
+    uint32_t formal_violations = 99U;
+    SHE_TEST_ASSERT(she_formal_run_proof_suite(&formal_checked, &formal_violations) == 0, "Formal FSM proof suite verifies all states");
+    SHE_TEST_ASSERT(formal_checked == 6U && formal_violations == 0U, "Formal FSM reports 6 verified rules and 0 violations");
+    SHE_TEST_ASSERT(she_fsm_verify_invariant(NULL) != 0, "chaos: Formal FSM catches NULL connection invariant");
 }
 
 int main(void) {

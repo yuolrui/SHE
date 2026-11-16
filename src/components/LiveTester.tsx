@@ -724,6 +724,54 @@ const PRESETS = [
     desc: 'Posts a 1MB zero-copy IBV_WR_RDMA_WRITE Work Request on Queue Pair #201 across the rack fabric.',
   },
   {
+    name: 'Co-Packaged Optics Status (/cpo-status)',
+    category: 'Phase 17',
+    method: 'GET',
+    path: '/cpo-status?json=1',
+    headers: {},
+    desc: 'Inspects 3.2 Tbps Co-Packaged Silicon Optics 8x400G wavelength lanes, laser power (dBm) & BER.',
+  },
+  {
+    name: 'Tune CPO Optical Lane (/cpo/tune)',
+    category: 'Phase 17',
+    method: 'GET',
+    path: '/cpo/tune?lane=1&power=-2',
+    headers: {},
+    desc: 'Locks and tunes CPO silicon photonic Lane #1 laser bias to -2 dBm across 3.2 Tbps fabric.',
+  },
+  {
+    name: 'BBRv3 Neural Pacer (/bbr-status)',
+    category: 'Phase 17',
+    method: 'GET',
+    path: '/bbr-status?json=1',
+    headers: {},
+    desc: 'Inspects autonomous eBPF BBRv3 + neural pacing flow states, minRTT, bottleneck bandwidth & gains.',
+  },
+  {
+    name: 'Commit BBRv3 Pacing (/bbr/pace)',
+    category: 'Phase 17',
+    method: 'GET',
+    path: '/bbr/pace?flow=101&rtt_us=180&bw_mbps=40000',
+    headers: {},
+    desc: 'Computes neural BBRv3 pacing rate (50.0 Gbps at 1.25x ProbeBW gain) for Flow #101.',
+  },
+  {
+    name: 'Formal FSM Kernel (/formal-status)',
+    category: 'Phase 17',
+    method: 'GET',
+    path: '/formal-status?json=1',
+    headers: {},
+    desc: 'Inspects runtime connection FSM invariant counter, zero-violation verdict & SHA-256 proof digest.',
+  },
+  {
+    name: 'Verify Formal FSM Proofs (/formal/verify)',
+    category: 'Phase 17',
+    method: 'GET',
+    path: '/formal/verify',
+    headers: {},
+    desc: 'Runs live 6-state she_connection_t FSM invariant proof suite and emits QED SHA-256 digest.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -1014,7 +1062,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 16)
+            SHE Production Engine Presets (Phases 1 - 17)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

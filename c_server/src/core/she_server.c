@@ -47,6 +47,9 @@
 #include "modules/mod_dpu_offload.h"
 #include "modules/mod_zk_attest.h"
 #include "modules/mod_rdma.h"
+#include "modules/mod_cpo.h"
+#include "modules/mod_bbrv3.h"
+#include "modules/mod_formal_fsm.h"
 #include "core/she_config.h"
 #include "security/she_security.h"
 #include <stdlib.h>
@@ -189,6 +192,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_dpu_offload_plugin_init());
     she_plugins_register(srv, mod_zk_attest_plugin_init());
     she_plugins_register(srv, mod_rdma_plugin_init());
+    she_plugins_register(srv, mod_cpo_plugin_init());
+    she_plugins_register(srv, mod_bbrv3_plugin_init());
+    she_plugins_register(srv, mod_formal_fsm_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());

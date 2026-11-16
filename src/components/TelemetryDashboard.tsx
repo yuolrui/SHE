@@ -183,6 +183,51 @@ interface RdmaSnapshot {
   qps: RdmaQp[];
 }
 
+interface CpoLane {
+  lane_id: number;
+  wavelength_nm: number;
+  tx_power_dbm: number;
+  gbps: number;
+  frames_switched: number;
+  locked: boolean;
+}
+
+interface CpoSnapshot {
+  fabric_name: string;
+  total_lanes: number;
+  aggregate_gbps: number;
+  tuning_ops: number;
+  avg_ber_exponent: number;
+  lanes: CpoLane[];
+}
+
+interface BbrFlow {
+  flow_id: number;
+  phase: string;
+  min_rtt_us: number;
+  btlbw_mbps: number;
+  pacing_gain: number;
+  pacing_rate_bps: number;
+  loss_rate_pct: number;
+}
+
+interface BbrSnapshot {
+  algorithm: string;
+  active_flows: number;
+  total_pacing_updates: number;
+  microbursts_smoothed: number;
+  flows: BbrFlow[];
+}
+
+interface FormalSnapshot {
+  solver_engine: string;
+  invariants_checked: number;
+  violations_detected: number;
+  proof_runs: number;
+  last_verdict: string;
+  last_proof_digest: string;
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -238,6 +283,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [dpu, setDpu] = useState<DpuSnapshot | null>(null);
   const [zk, setZk] = useState<ZkSnapshot | null>(null);
   const [rdma, setRdma] = useState<RdmaSnapshot | null>(null);
+  const [cpo, setCpo] = useState<CpoSnapshot | null>(null);
+  const [bbr, setBbr] = useState<BbrSnapshot | null>(null);
+  const [formal, setFormal] = useState<FormalSnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -248,7 +296,7 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
@@ -261,6 +309,9 @@ export const TelemetryDashboard: React.FC = () => {
         queryCEngine<DpuSnapshot>('/dpu-status?json=1'),
         queryCEngine<ZkSnapshot>('/zk-status?json=1'),
         queryCEngine<RdmaSnapshot>('/rdma-status?json=1'),
+        queryCEngine<CpoSnapshot>('/cpo-status?json=1'),
+        queryCEngine<BbrSnapshot>('/bbr-status?json=1'),
+        queryCEngine<FormalSnapshot>('/formal-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -291,6 +342,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (dpuRes.data) setDpu(dpuRes.data);
       if (zkRes.data) setZk(zkRes.data);
       if (rdmaRes.data) setRdma(rdmaRes.data);
+      if (cpoRes.data) setCpo(cpoRes.data);
+      if (bbrRes.data) setBbr(bbrRes.data);
+      if (fmRes.data) setFormal(fmRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -372,6 +426,26 @@ export const TelemetryDashboard: React.FC = () => {
       if (dpuRes.data && zkRes.data && rdmaRes.data) {
         setActionBanner(
           `DOCA Flow #${dpuRes.data.nic_flow_id} offloaded · Groth16 ZK proved (${zkRes.data.verify_time_us}us) · RDMA QP#${rdmaRes.data.qp_num} DMA +${formatBytes(rdmaRes.data.dma_bytes_posted)}`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
+  const handleRunCpoBbrFormal = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [cpoRes, bbrRes, fmRes] = await Promise.all([
+        queryCEngine<{ lane_id: number; aggregate_gbps: number; target_power_dbm: number }>('/cpo/tune?lane=1&power=-2'),
+        queryCEngine<{ flow_id: number; phase: string; pacing_rate_bps: number }>('/bbr/pace?flow=101&rtt_us=180&bw_mbps=40000'),
+        queryCEngine<{ status: string; rules_verified: number; violations_detected: number }>('/formal/verify'),
+      ]);
+      if (cpoRes.data && bbrRes.data && fmRes.data) {
+        setActionBanner(
+          `CPO Lane #${cpoRes.data.lane_id} tuned (${cpoRes.data.aggregate_gbps} Gbps) · BBRv3 ${bbrRes.data.phase} (${(bbrRes.data.pacing_rate_bps / 1e9).toFixed(1)} Gbps) · Formal FSM ${fmRes.data.status} (${fmRes.data.rules_verified} rules, ${fmRes.data.violations_detected} violations)`
         );
       }
       await fetchAllTelemetry();
@@ -484,6 +558,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <Cpu className="w-3.5 h-3.5" />
             <span>DPU · ZK · RDMA</span>
+          </button>
+
+          <button
+            onClick={handleRunCpoBbrFormal}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-cyan-950 bg-cyan-400 hover:bg-cyan-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>CPO · BBRv3 · Formal</span>
           </button>
 
           <button
@@ -1003,6 +1086,100 @@ export const TelemetryDashboard: React.FC = () => {
                     <td className="px-4 py-2 text-slate-400">{qp.remote_rkey}</td>
                     <td className="px-4 py-2 text-right text-slate-300 tabular-nums">{qp.wr_posted.toLocaleString()}</td>
                     <td className="px-4 py-2 text-right text-emerald-300 tabular-nums">{formatBytes(qp.dma_bytes)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 17: Exascale Co-Packaged Optics, BBRv3 Neural Pacing & Formal Proof Kernel */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                Co-Packaged Optics & Formal Proof Kernel (mod_cpo + mod_formal_fsm)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {cpo ? `${cpo.fabric_name} · ${cpo.total_lanes}x400G Lanes · BER 10^(${cpo.avg_ber_exponent})` : 'Loading CPO silicon photonics...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+              {cpo ? `${cpo.aggregate_gbps} Gbps` : '--'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">FSM Invariants Verified</span>
+              <div className="text-base font-bold text-emerald-400 tabular-nums">
+                {formal ? formal.invariants_checked.toLocaleString() : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {formal ? `${formal.violations_detected} violations · ${formal.proof_runs.toLocaleString()} QED runs` : ''}
+              </span>
+            </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">Optical Lane Tuning Ops</span>
+              <div className="text-base font-bold text-cyan-400 tabular-nums">
+                {cpo ? cpo.tuning_ops.toLocaleString() : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {formal ? formal.last_verdict : 'Awaiting solver...'}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5 text-xs font-mono">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Solver Engine</span>
+              <span className="text-cyan-300">{formal?.solver_engine || '--'}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">Proof Digest SHA-256</span>
+              <span className="text-emerald-300 truncate" title={formal?.last_proof_digest}>
+                {formal?.last_proof_digest || '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">Autonomous eBPF BBRv3 Neural Pacing (mod_bbrv3)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {bbr ? `${bbr.algorithm} · ${bbr.total_pacing_updates.toLocaleString()} updates` : 'Loading BBRv3 telemetry...'}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-cyan-300 font-bold tabular-nums">
+              {bbr ? `${bbr.microbursts_smoothed.toLocaleString()} bursts smoothed` : '--'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2 font-medium">Flow</th>
+                  <th className="px-4 py-2 font-medium">State Phase</th>
+                  <th className="px-4 py-2 font-medium">MinRTT</th>
+                  <th className="px-4 py-2 font-medium text-right">Gain</th>
+                  <th className="px-4 py-2 font-medium text-right">Pacing Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(bbr?.flows || []).map((fl) => (
+                  <tr key={fl.flow_id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2 text-cyan-300 font-bold">#{fl.flow_id}</td>
+                    <td className="px-4 py-2 text-slate-200">{fl.phase}</td>
+                    <td className="px-4 py-2 text-sky-300 tabular-nums">{fl.min_rtt_us} us</td>
+                    <td className="px-4 py-2 text-right text-slate-300 tabular-nums">{fl.pacing_gain.toFixed(2)}x</td>
+                    <td className="px-4 py-2 text-right text-emerald-300 tabular-nums">
+                      {(fl.pacing_rate_bps / 1e9).toFixed(1)} Gbps
+                    </td>
                   </tr>
                 ))}
               </tbody>
