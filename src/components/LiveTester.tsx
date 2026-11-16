@@ -868,6 +868,54 @@ const PRESETS = [
     desc: 'Mints a cryptographically random ephemeral TLS session key via OpenSSL RAND_bytes and seals it into the enclave.',
   },
   {
+    name: 'GPU TEE Status (/gpu-tee-status)',
+    category: 'Phase 20',
+    method: 'GET',
+    path: '/gpu-tee-status?json=1',
+    headers: {},
+    desc: 'Inspects NVIDIA Hopper Confidential Compute GPU enclaves, NVLink isolation & tensor pipeline digests.',
+  },
+  {
+    name: 'Attest GPU Tensor Context (/gpu-tee/attest)',
+    category: 'Phase 20',
+    method: 'GET',
+    path: '/gpu-tee/attest?device=0&model=llama4-405b-fp8',
+    headers: {},
+    desc: 'Attests GPU #0 NVLink tensor execution context and emits SHA-256 hardware digest.',
+  },
+  {
+    name: 'ML-DSA-87 Mesh Status (/mldsa-status)',
+    category: 'Phase 20',
+    method: 'GET',
+    path: '/mldsa-status?json=1',
+    headers: {},
+    desc: 'Inspects hybrid NIST FIPS 204 ML-DSA-87 + Ed25519 zero-trust control plane signature counters.',
+  },
+  {
+    name: 'Verify ML-DSA+Ed25519 Envelope (/mldsa/verify)',
+    category: 'Phase 20',
+    method: 'GET',
+    path: '/mldsa/verify?signer=she-ctrl-primary&payload=route-epoch-20',
+    headers: {},
+    desc: 'Signs & verifies a control-plane message with OpenSSL Ed25519 and computes hybrid SHA-256 commitment.',
+  },
+  {
+    name: 'RDMA State Snapshots (/rdma-snap-status)',
+    category: 'Phase 20',
+    method: 'GET',
+    path: '/rdma-snap-status?json=1',
+    headers: {},
+    desc: 'Inspects cross-region RoCEv2 RDMA deterministic state snapshots and SHA-256 Merkle roots.',
+  },
+  {
+    name: 'Commit RDMA Snapshot (/rdma-snap/commit)',
+    category: 'Phase 20',
+    method: 'GET',
+    path: '/rdma-snap/commit?region=us-west-2',
+    headers: {},
+    desc: 'Commits a deterministic state checkpoint to us-west-2 via RDMA snapshot replication.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -1158,7 +1206,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 19)
+            SHE Production Engine Presets (Phases 1 - 20)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>

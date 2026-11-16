@@ -31,6 +31,9 @@
 #include "modules/mod_enclave.h"
 #include "modules/mod_neuro_edge.h"
 #include "modules/mod_keyvault.h"
+#include "modules/mod_gpu_tee.h"
+#include "modules/mod_mldsa_mesh.h"
+#include "modules/mod_rdma_snap.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -233,6 +236,19 @@ static void test_config_loader_and_plugins(void) {
     SHE_TEST_ASSERT(she_keyvault_seal_session_key("sovereign-ai", 3600U, kv_key_id, sizeof(kv_key_id), &kv_epoch) == 0 && strncmp(kv_key_id, "kv-", 3) == 0, "KeyVault seals ephemeral key with kv- prefix");
     SHE_TEST_ASSERT(kv_epoch > 880ULL, "KeyVault increments rotation epoch cleanly");
     SHE_TEST_ASSERT(she_keyvault_seal_session_key("sovereign-ai", 99999U, kv_key_id, sizeof(kv_key_id), &kv_epoch) != 0, "chaos: KeyVault rejects out-of-bounds TTL > 86400");
+
+    char gpu_digest[65] = {0};
+    SHE_TEST_ASSERT(she_gpu_tee_attest_context(0U, "llama4-405b-fp8", gpu_digest, sizeof(gpu_digest)) == 0 && strlen(gpu_digest) == 64, "GPU TEE attests device 0 context with 64-hex SHA-256");
+    SHE_TEST_ASSERT(she_gpu_tee_attest_context(99U, "bad-gpu", gpu_digest, sizeof(gpu_digest)) != 0, "chaos: GPU TEE rejects out-of-range device_id=99");
+
+    char mldsa_sig[65] = {0};
+    SHE_TEST_ASSERT(she_pqc_mldsa_verify_envelope("she-ctrl-primary", "route-epoch-20", mldsa_sig, sizeof(mldsa_sig)) == 0 && strlen(mldsa_sig) == 64, "ML-DSA-87 + Ed25519 verifies trusted she- control plane envelope");
+    SHE_TEST_ASSERT(she_pqc_mldsa_verify_envelope("rogue-node-x", "tampered", mldsa_sig, sizeof(mldsa_sig)) != 0, "chaos: ML-DSA mesh rejects untrusted signer prefix");
+
+    char snap_id[48] = {0};
+    char snap_merkle[65] = {0};
+    SHE_TEST_ASSERT(she_rdma_snap_commit("us-west-2", 5001ULL, snap_id, sizeof(snap_id), snap_merkle, sizeof(snap_merkle)) == 0 && strncmp(snap_id, "snap-", 5) == 0 && strlen(snap_merkle) == 64, "RDMA snapshot commits us-west-2 Merkle root");
+    SHE_TEST_ASSERT(she_rdma_snap_commit("invalid-region", 0ULL, snap_id, sizeof(snap_id), snap_merkle, sizeof(snap_merkle)) != 0, "chaos: RDMA snapshot rejects invalid region / seq=0");
 }
 
 int main(void) {

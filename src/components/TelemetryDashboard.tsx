@@ -317,6 +317,51 @@ interface KeyvaultSnapshot {
   last_sealed_key_id: string;
 }
 
+interface GpuTeeDev {
+  device_id: number;
+  gpu_arch: string;
+  model_tag: string;
+  vram_gb: number;
+  nvlink_isolated: boolean;
+  context_digest: string;
+}
+
+interface GpuTeeSnapshot {
+  module: string;
+  version: string;
+  driver_mode: string;
+  contexts_attested: number;
+  attest_rejections: number;
+  devices: GpuTeeDev[];
+}
+
+interface MldsaSnapshot {
+  module: string;
+  version: string;
+  suite_name: string;
+  pqc_standard: string;
+  envelopes_verified: number;
+  envelopes_rejected: number;
+  last_signer: string;
+  last_signature_hex: string;
+}
+
+interface RdmaSnapEntry {
+  snap_id: string;
+  region: string;
+  state_seq: number;
+  merkle_root: string;
+}
+
+interface RdmaSnapSnapshot {
+  module: string;
+  version: string;
+  transport: string;
+  snapshots_committed: number;
+  bytes_replicated: number;
+  snapshots: RdmaSnapEntry[];
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -381,6 +426,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [enclave, setEnclave] = useState<EnclaveSnapshot | null>(null);
   const [neuro, setNeuro] = useState<NeuroSnapshot | null>(null);
   const [keyvault, setKeyvault] = useState<KeyvaultSnapshot | null>(null);
+  const [gpuTee, setGpuTee] = useState<GpuTeeSnapshot | null>(null);
+  const [mldsa, setMldsa] = useState<MldsaSnapshot | null>(null);
+  const [rdmaSnap, setRdmaSnap] = useState<RdmaSnapSnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -391,7 +439,7 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes, encRes, neuRes, kvRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes, encRes, neuRes, kvRes, gpuRes, mldRes, snapRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
@@ -413,6 +461,9 @@ export const TelemetryDashboard: React.FC = () => {
         queryCEngine<EnclaveSnapshot>('/enclave-status?json=1'),
         queryCEngine<NeuroSnapshot>('/neuro-status?json=1'),
         queryCEngine<KeyvaultSnapshot>('/keyvault-status?json=1'),
+        queryCEngine<GpuTeeSnapshot>('/gpu-tee-status?json=1'),
+        queryCEngine<MldsaSnapshot>('/mldsa-status?json=1'),
+        queryCEngine<RdmaSnapSnapshot>('/rdma-snap-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -452,6 +503,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (encRes.data) setEnclave(encRes.data);
       if (neuRes.data) setNeuro(neuRes.data);
       if (kvRes.data) setKeyvault(kvRes.data);
+      if (gpuRes.data) setGpuTee(gpuRes.data);
+      if (mldRes.data) setMldsa(mldRes.data);
+      if (snapRes.data) setRdmaSnap(snapRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -601,6 +655,26 @@ export const TelemetryDashboard: React.FC = () => {
     }
   };
 
+  const handleRunPhase20 = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [gpuRes, mldRes, snapRes] = await Promise.all([
+        queryCEngine<{ device_id: number; model_tag: string; contexts_attested: number }>('/gpu-tee/attest?device=0&model=llama4-405b-fp8'),
+        queryCEngine<{ suite: string; signer: string; envelopes_verified: number }>('/mldsa/verify?signer=she-ctrl-primary&payload=route-epoch-20'),
+        queryCEngine<{ snap_id: string; region: string; snapshots_committed: number }>('/rdma-snap/commit?region=us-west-2'),
+      ]);
+      if (gpuRes.data && mldRes.data && snapRes.data) {
+        setActionBanner(
+          `GPU#${gpuRes.data.device_id} ${gpuRes.data.model_tag} attested (#${gpuRes.data.contexts_attested}) · ${mldRes.data.suite} verified (#${mldRes.data.envelopes_verified}) · RDMA Snap ${snapRes.data.snap_id} -> ${snapRes.data.region}`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
   const totalStatusResponses = metrics
     ? metrics.http_status_200 + metrics.http_status_401 + metrics.http_status_404 + metrics.http_status_429
     : 0;
@@ -732,6 +806,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <Lock className="w-3.5 h-3.5" />
             <span>TEE · Neuro · Vault</span>
+          </button>
+
+          <button
+            onClick={handleRunPhase20}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-fuchsia-950 bg-fuchsia-400 hover:bg-fuchsia-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span>GPU · ML-DSA · Snap</span>
           </button>
 
           <button
@@ -1529,6 +1612,100 @@ export const TelemetryDashboard: React.FC = () => {
                       >
                         {nr.verdict}
                       </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 20: Confidential GPU TEE, ML-DSA-87 Control Mesh & Cross-Region RDMA Snapshots */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                Confidential GPU TEE & ML-DSA-87 Mesh (mod_gpu_tee + mod_mldsa_mesh)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {gpuTee ? `${gpuTee.driver_mode} · ${gpuTee.devices.length} GPUs NVLink Isolated` : 'Loading GPU TEE...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-800">
+              {mldsa ? `${mldsa.envelopes_verified.toLocaleString()} Signed` : '--'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">GPU Tensor Contexts Attested</span>
+              <div className="text-base font-bold text-fuchsia-300 tabular-nums">
+                {gpuTee ? gpuTee.contexts_attested.toLocaleString() : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {gpuTee?.devices?.[0] ? `${gpuTee.devices[0].model_tag} (${gpuTee.devices[0].vram_gb}GB)` : ''}
+              </span>
+            </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">PQC Control Plane Suite</span>
+              <div className="text-sm font-bold text-emerald-400 truncate" title={mldsa?.suite_name}>
+                {mldsa?.suite_name || '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {mldsa ? `${mldsa.pqc_standard} · Signer: ${mldsa.last_signer}` : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5 text-xs font-mono">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">GPU#0 NVLink Context Digest</span>
+              <span className="text-fuchsia-300 truncate" title={gpuTee?.devices?.[0]?.context_digest}>
+                {gpuTee?.devices?.[0]?.context_digest || '--'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">Ed25519+ML-DSA Composite Sig</span>
+              <span className="text-emerald-300 truncate" title={mldsa?.last_signature_hex}>
+                {mldsa?.last_signature_hex || '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">Cross-Region RDMA State Snapshots (mod_rdma_snap)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {rdmaSnap ? `${rdmaSnap.transport} · ${formatBytes(rdmaSnap.bytes_replicated)} synced` : 'Loading RDMA snapshots...'}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-fuchsia-300 font-bold tabular-nums">
+              {rdmaSnap ? `${rdmaSnap.snapshots_committed.toLocaleString()} commits` : '--'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2 font-medium">Snapshot ID</th>
+                  <th className="px-4 py-2 font-medium">Region</th>
+                  <th className="px-4 py-2 font-medium">Seq</th>
+                  <th className="px-4 py-2 font-medium">Merkle SHA-256</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rdmaSnap?.snapshots || []).map((sn) => (
+                  <tr key={sn.region} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2 text-fuchsia-300 font-bold">{sn.snap_id}</td>
+                    <td className="px-4 py-2 text-slate-200">{sn.region}</td>
+                    <td className="px-4 py-2 text-sky-300 tabular-nums">#{sn.state_seq}</td>
+                    <td className="px-4 py-2 text-emerald-300 truncate max-w-[160px]" title={sn.merkle_root}>
+                      {sn.merkle_root}
                     </td>
                   </tr>
                 ))}

@@ -56,6 +56,9 @@
 #include "modules/mod_enclave.h"
 #include "modules/mod_neuro_edge.h"
 #include "modules/mod_keyvault.h"
+#include "modules/mod_gpu_tee.h"
+#include "modules/mod_mldsa_mesh.h"
+#include "modules/mod_rdma_snap.h"
 #include "core/she_config.h"
 #include "security/she_security.h"
 #include <stdlib.h>
@@ -207,6 +210,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_enclave_plugin_init());
     she_plugins_register(srv, mod_neuro_edge_plugin_init());
     she_plugins_register(srv, mod_keyvault_plugin_init());
+    she_plugins_register(srv, mod_gpu_tee_plugin_init());
+    she_plugins_register(srv, mod_mldsa_mesh_plugin_init());
+    she_plugins_register(srv, mod_rdma_snap_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());
