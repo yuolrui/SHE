@@ -277,6 +277,46 @@ interface ReplaySnapshot {
   recent_events: ReplayEvent[];
 }
 
+interface EnclaveSnapshot {
+  module: string;
+  version: string;
+  tee_platform: string;
+  tcb_version: string;
+  debug_disabled: boolean;
+  quotes_verified: number;
+  quotes_rejected: number;
+  last_nonce: string;
+  last_measurement_hex: string;
+}
+
+interface NeuroNeuron {
+  flow_id: number;
+  isi_us: number;
+  membrane_mv: number;
+  verdict: string;
+}
+
+interface NeuroSnapshot {
+  module: string;
+  version: string;
+  model_name: string;
+  fire_threshold_mv: number;
+  spikes_evaluated: number;
+  anomalies_fired: number;
+  neurons: NeuroNeuron[];
+}
+
+interface KeyvaultSnapshot {
+  module: string;
+  version: string;
+  vault_name: string;
+  sealing_cipher: string;
+  sealed_keys_total: number;
+  rotation_epoch: number;
+  last_tenant: string;
+  last_sealed_key_id: string;
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -338,6 +378,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [afxdp, setAfxdp] = useState<AfxdpSnapshot | null>(null);
   const [federation, setFederation] = useState<FederationSnapshot | null>(null);
   const [replay, setReplay] = useState<ReplaySnapshot | null>(null);
+  const [enclave, setEnclave] = useState<EnclaveSnapshot | null>(null);
+  const [neuro, setNeuro] = useState<NeuroSnapshot | null>(null);
+  const [keyvault, setKeyvault] = useState<KeyvaultSnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -348,7 +391,7 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes, encRes, neuRes, kvRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
@@ -367,6 +410,9 @@ export const TelemetryDashboard: React.FC = () => {
         queryCEngine<AfxdpSnapshot>('/afxdp-status?json=1'),
         queryCEngine<FederationSnapshot>('/federation-status?json=1'),
         queryCEngine<ReplaySnapshot>('/replay-status?json=1'),
+        queryCEngine<EnclaveSnapshot>('/enclave-status?json=1'),
+        queryCEngine<NeuroSnapshot>('/neuro-status?json=1'),
+        queryCEngine<KeyvaultSnapshot>('/keyvault-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -403,6 +449,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (afxRes.data) setAfxdp(afxRes.data);
       if (fedRes.data) setFederation(fedRes.data);
       if (repRes.data) setReplay(repRes.data);
+      if (encRes.data) setEnclave(encRes.data);
+      if (neuRes.data) setNeuro(neuRes.data);
+      if (kvRes.data) setKeyvault(kvRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -524,6 +573,26 @@ export const TelemetryDashboard: React.FC = () => {
       if (afxRes.data && fedRes.data && repRes.data) {
         setActionBanner(
           `AF_XDP ${afxRes.data.ifname}:Q${afxRes.data.queue_id} (${afxRes.data.umem_frames} UMEM frames) · Federation ${fedRes.data.cluster_id} Epoch #${fedRes.data.global_epoch} · Replay #${repRes.data.seq_verified} (${repRes.data.deterministic_hash})`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
+  const handleRunPhase19 = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [encRes, neuRes, kvRes] = await Promise.all([
+        queryCEngine<{ tee_platform: string; measurement_sha256: string; quotes_verified: number }>('/enclave/attest?platform=AMD-SEV-SNP&nonce=prod-quote-01'),
+        queryCEngine<{ flow_id: number; membrane_mv: number; verdict: string }>('/neuro/spike?flow=401&isi_us=120'),
+        queryCEngine<{ sealed_key_id: string; rotation_epoch: number; tenant: string }>('/keyvault/seal?tenant=sovereign-ai&ttl=3600'),
+      ]);
+      if (encRes.data && neuRes.data && kvRes.data) {
+        setActionBanner(
+          `TEE ${encRes.data.tee_platform} attested (#${encRes.data.quotes_verified}) · Neuro Flow #${neuRes.data.flow_id} ${neuRes.data.verdict} (${neuRes.data.membrane_mv}mV) · KeyVault ${kvRes.data.sealed_key_id} Epoch #${kvRes.data.rotation_epoch}`
         );
       }
       await fetchAllTelemetry();
@@ -654,6 +723,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <Network className="w-3.5 h-3.5" />
             <span>AF_XDP · Fed · Replay</span>
+          </button>
+
+          <button
+            onClick={handleRunPhase19}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-950 bg-teal-400 hover:bg-teal-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>TEE · Neuro · Vault</span>
           </button>
 
           <button
@@ -1349,6 +1427,108 @@ export const TelemetryDashboard: React.FC = () => {
                     <td className="px-4 py-2 text-slate-300 tabular-nums">#{cl.epoch}</td>
                     <td className="px-4 py-2 text-slate-400 truncate max-w-[140px]" title={cl.policy_digest}>
                       {cl.policy_digest}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 19: Confidential Computing Enclaves, Neuromorphic Edge & Ephemeral KeyVault */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                Confidential TEE Enclave & KeyVault (mod_enclave + mod_keyvault)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {enclave ? `${enclave.tee_platform} · TCB ${enclave.tcb_version} · Debug Disabled` : 'Loading TEE attestation...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">
+              {enclave ? `${enclave.quotes_verified.toLocaleString()} Verified` : '--'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">Hardware-Sealed TLS Keys</span>
+              <div className="text-base font-bold text-teal-300 tabular-nums">
+                {keyvault ? keyvault.sealed_keys_total.toLocaleString() : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {keyvault ? `${keyvault.sealing_cipher} · Epoch #${keyvault.rotation_epoch}` : ''}
+              </span>
+            </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">Last Sealed Ephemeral Key</span>
+              <div className="text-sm font-bold text-emerald-400 truncate" title={keyvault?.last_sealed_key_id}>
+                {keyvault?.last_sealed_key_id || '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {keyvault ? `Tenant: ${keyvault.last_tenant}` : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5 text-xs font-mono">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Attestation Nonce / Rejected</span>
+              <span className="text-teal-300">
+                {enclave ? `${enclave.last_nonce} · ${enclave.quotes_rejected} rejected` : '--'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">TEE SHA-256 Measurement</span>
+              <span className="text-emerald-300 truncate" title={enclave?.last_measurement_hex}>
+                {enclave?.last_measurement_hex || '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">Neuromorphic STDP Edge Classifier (mod_neuro_edge)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {neuro ? `${neuro.model_name} · Fire >= ${neuro.fire_threshold_mv}mV` : 'Loading STDP synapses...'}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-teal-300 font-bold tabular-nums">
+              {neuro ? `${neuro.anomalies_fired.toLocaleString()} spikes dropped` : '--'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2 font-medium">Synapse Flow</th>
+                  <th className="px-4 py-2 font-medium">ISI (us)</th>
+                  <th className="px-4 py-2 font-medium">Membrane</th>
+                  <th className="px-4 py-2 font-medium text-right">STDP Verdict</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(neuro?.neurons || []).map((nr) => (
+                  <tr key={nr.flow_id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2 text-teal-300 font-bold">#{nr.flow_id}</td>
+                    <td className="px-4 py-2 text-slate-200 tabular-nums">{nr.isi_us} us</td>
+                    <td className="px-4 py-2 text-sky-300 tabular-nums">{nr.membrane_mv} mV</td>
+                    <td className="px-4 py-2 text-right">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          nr.verdict === 'SPIKE_ANOMALY_DROP'
+                            ? 'bg-rose-950/80 text-rose-300 border border-rose-800/70'
+                            : 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/70'
+                        }`}
+                      >
+                        {nr.verdict}
+                      </span>
                     </td>
                   </tr>
                 ))}

@@ -74,11 +74,11 @@ export const PluginsView: React.FC = () => {
       {/* Intro Header */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
         <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mb-2">
-          <span className="text-emerald-400 font-bold">SHE: Phase 18 Active</span>
+          <span className="text-emerald-400 font-bold">SHE: Phase 19 Active</span>
           <span aria-hidden="true">·</span>
           <span>Lighttpd-style she_plugin_t Subsystem</span>
           <span aria-hidden="true">·</span>
-          <span>53 Active Modular Plugins</span>
+          <span>56 Active Modular Plugins</span>
         </div>
         <h2 className="text-xl font-bold text-white tracking-tight">
           SHE Modular Pipeline & Configuration Workbench
@@ -86,8 +86,9 @@ export const PluginsView: React.FC = () => {
         <p className="text-xs text-slate-300 leading-relaxed max-w-3xl mt-1">
           SHE&apos;s modular architecture decouples high-level HTTP features into isolated plugins that hook into URI cleaning,
           subrequest evaluation, and response finalization. Built-in modules include <code className="text-emerald-300">she_security</code>,{' '}
-          <code className="text-emerald-300">mod_afxdp</code>, <code className="text-emerald-300">mod_federation</code>,{' '}
-          <code className="text-emerald-300">mod_replay</code>, <code className="text-emerald-300">mod_cpo</code>, <code className="text-emerald-300">mod_bbrv3</code>,{' '}
+          <code className="text-emerald-300">mod_enclave</code>, <code className="text-emerald-300">mod_neuro_edge</code>,{' '}
+          <code className="text-emerald-300">mod_keyvault</code>, <code className="text-emerald-300">mod_afxdp</code>,{' '}
+          <code className="text-emerald-300">mod_federation</code>, <code className="text-emerald-300">mod_replay</code>,{' '}
           <code className="text-emerald-300">mod_formal_fsm</code>, <code className="text-emerald-300">mod_dpu_offload</code>,{' '}
           <code className="text-emerald-300">mod_zk_attest</code>,{' '}
           <code className="text-emerald-300">mod_rdma</code>, <code className="text-emerald-300">mod_io_uring</code>,{' '}

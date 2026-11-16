@@ -28,6 +28,9 @@
 #include "modules/mod_afxdp.h"
 #include "modules/mod_federation.h"
 #include "modules/mod_replay.h"
+#include "modules/mod_enclave.h"
+#include "modules/mod_neuro_edge.h"
+#include "modules/mod_keyvault.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -213,6 +216,23 @@ static void test_config_loader_and_plugins(void) {
     SHE_TEST_ASSERT(she_replay_record_event("GET", "/federation-status", 200, &replay_seq) == 0, "Replay tracer records event cleanly");
     SHE_TEST_ASSERT(she_replay_verify_trace(replay_seq, replay_chk, sizeof(replay_chk)) == 0 && strlen(replay_chk) == 16, "Replay verifies deterministic 16-hex hash");
     SHE_TEST_ASSERT(she_replay_verify_trace(0ULL, replay_chk, sizeof(replay_chk)) != 0, "chaos: Replay rejects invalid seq=0");
+
+    char tee_meas[65] = {0};
+    SHE_TEST_ASSERT(she_enclave_verify_quote("AMD-SEV-SNP", "prod-quote-01", tee_meas, sizeof(tee_meas)) == 0 && strlen(tee_meas) == 64, "Enclave verifies AMD-SEV-SNP attestation quote");
+    SHE_TEST_ASSERT(she_enclave_verify_quote("INTEL-TDX", "tdx-nonce-02", tee_meas, sizeof(tee_meas)) == 0 && strlen(tee_meas) == 64, "Enclave verifies INTEL-TDX attestation quote");
+    SHE_TEST_ASSERT(she_enclave_verify_quote("UNTRUSTED-CPU", "nonce", tee_meas, sizeof(tee_meas)) != 0, "chaos: Enclave rejects unsupported TEE platform");
+
+    uint32_t neuro_mv = 0U;
+    char neuro_verdict[24] = {0};
+    SHE_TEST_ASSERT(she_neuro_classify_spike(401U, 120U, &neuro_mv, neuro_verdict, sizeof(neuro_verdict)) == 0 && strcmp(neuro_verdict, "BENIGN_PASS") == 0, "Neuromorphic edge classifies nominal ISI as BENIGN_PASS");
+    SHE_TEST_ASSERT(she_neuro_classify_spike(403U, 15U, &neuro_mv, neuro_verdict, sizeof(neuro_verdict)) == 0 && neuro_mv >= 70U && strcmp(neuro_verdict, "SPIKE_ANOMALY_DROP") == 0, "Neuromorphic STDP fires SPIKE_ANOMALY_DROP on rapid burst ISI < 25us");
+    SHE_TEST_ASSERT(she_neuro_classify_spike(0U, 0U, &neuro_mv, neuro_verdict, sizeof(neuro_verdict)) != 0, "chaos: Neuromorphic classifier rejects flow_id=0 / isi_us=0");
+
+    char kv_key_id[33] = {0};
+    uint64_t kv_epoch = 0ULL;
+    SHE_TEST_ASSERT(she_keyvault_seal_session_key("sovereign-ai", 3600U, kv_key_id, sizeof(kv_key_id), &kv_epoch) == 0 && strncmp(kv_key_id, "kv-", 3) == 0, "KeyVault seals ephemeral key with kv- prefix");
+    SHE_TEST_ASSERT(kv_epoch > 880ULL, "KeyVault increments rotation epoch cleanly");
+    SHE_TEST_ASSERT(she_keyvault_seal_session_key("sovereign-ai", 99999U, kv_key_id, sizeof(kv_key_id), &kv_epoch) != 0, "chaos: KeyVault rejects out-of-bounds TTL > 86400");
 }
 
 int main(void) {

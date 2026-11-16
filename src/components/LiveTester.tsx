@@ -820,6 +820,54 @@ const PRESETS = [
     desc: 'Recomputes deterministic FNV1a-64 execution checksum on the latest captured request frame.',
   },
   {
+    name: 'TEE Enclave Status (/enclave-status)',
+    category: 'Phase 19',
+    method: 'GET',
+    path: '/enclave-status?json=1',
+    headers: {},
+    desc: 'Inspects AMD SEV-SNP / Intel TDX confidential enclave attestation status, TCB version, and verified quotes.',
+  },
+  {
+    name: 'Verify TEE Enclave Quote (/enclave/attest)',
+    category: 'Phase 19',
+    method: 'GET',
+    path: '/enclave/attest?platform=AMD-SEV-SNP&nonce=prod-quote-01',
+    headers: {},
+    desc: 'Computes SHA-256 hardware measurement digest over AMD SEV-SNP report payload and nonce.',
+  },
+  {
+    name: 'Neuromorphic STDP Edge (/neuro-status)',
+    category: 'Phase 19',
+    method: 'GET',
+    path: '/neuro-status?json=1',
+    headers: {},
+    desc: 'Inspects STDP neuromorphic L7 anomaly classifier synapses, firing threshold (70mV), and spike counts.',
+  },
+  {
+    name: 'Classify Neuromorphic Spike (/neuro/spike)',
+    category: 'Phase 19',
+    method: 'GET',
+    path: '/neuro/spike?flow=401&isi_us=120',
+    headers: {},
+    desc: 'Evaluates flow inter-spike interval (ISI) membrane potential and emits BENIGN_PASS or SPIKE_ANOMALY_DROP.',
+  },
+  {
+    name: 'Enclave KeyVault Status (/keyvault-status)',
+    category: 'Phase 19',
+    method: 'GET',
+    path: '/keyvault-status?json=1',
+    headers: {},
+    desc: 'Inspects AES-256-GCM TEE-sealed ephemeral TLS session key vault, rotation epoch, and latest sealed key ID.',
+  },
+  {
+    name: 'Seal Ephemeral Key (/keyvault/seal)',
+    category: 'Phase 19',
+    method: 'GET',
+    path: '/keyvault/seal?tenant=sovereign-ai&ttl=3600',
+    headers: {},
+    desc: 'Mints a cryptographically random ephemeral TLS session key via OpenSSL RAND_bytes and seals it into the enclave.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -1110,7 +1158,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 18)
+            SHE Production Engine Presets (Phases 1 - 19)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>
