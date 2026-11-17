@@ -59,6 +59,9 @@
 #include "modules/mod_gpu_tee.h"
 #include "modules/mod_mldsa_mesh.h"
 #include "modules/mod_rdma_snap.h"
+#include "modules/mod_cxl_fabric.h"
+#include "modules/mod_orbital_mesh.h"
+#include "modules/mod_mpc_telemetry.h"
 #include "core/she_config.h"
 #include "security/she_security.h"
 #include <stdlib.h>
@@ -213,6 +216,9 @@ she_server_t *she_server_init(const she_server_config_t *cfg) {
     she_plugins_register(srv, mod_gpu_tee_plugin_init());
     she_plugins_register(srv, mod_mldsa_mesh_plugin_init());
     she_plugins_register(srv, mod_rdma_snap_plugin_init());
+    she_plugins_register(srv, mod_cxl_fabric_plugin_init());
+    she_plugins_register(srv, mod_orbital_mesh_plugin_init());
+    she_plugins_register(srv, mod_mpc_telemetry_plugin_init());
     she_plugins_register(srv, mod_proxy_plugin_init());
     she_plugins_register(srv, mod_deflate_plugin_init());
     she_plugins_register(srv, mod_status_plugin_init());

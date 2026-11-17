@@ -362,6 +362,54 @@ interface RdmaSnapSnapshot {
   snapshots: RdmaSnapEntry[];
 }
 
+interface CxlPoolEntry {
+  pool_id: number;
+  label: string;
+  capacity_gb: number;
+  allocated_bytes: number;
+  access_ns: number;
+  coherent_cache: boolean;
+}
+
+interface CxlFabricSnapshot {
+  module: string;
+  version: string;
+  cxl_spec: string;
+  total_alloc_ops: number;
+  total_alloc_bytes: number;
+  last_fabric_addr: string;
+  pools: CxlPoolEntry[];
+}
+
+interface OrbitalLinkEntry {
+  sat_id: string;
+  orbit_shell: string;
+  doppler_khz: number;
+  snr_db: number;
+  link_gbps: number;
+  wave_lock: string;
+}
+
+interface OrbitalMeshSnapshot {
+  module: string;
+  version: string;
+  constellation_id: string;
+  frames_relayed: number;
+  doppler_resyncs: number;
+  links: OrbitalLinkEntry[];
+}
+
+interface MpcTelemetrySnapshot {
+  module: string;
+  version: string;
+  protocol_name: string;
+  party_quorum: number;
+  rounds_aggregated: number;
+  cumulative_blinded_sum: number;
+  last_cohort: string;
+  last_transcript_hex: string;
+}
+
 interface TelemetryPoint {
   ts: string;
   requests: number;
@@ -429,6 +477,9 @@ export const TelemetryDashboard: React.FC = () => {
   const [gpuTee, setGpuTee] = useState<GpuTeeSnapshot | null>(null);
   const [mldsa, setMldsa] = useState<MldsaSnapshot | null>(null);
   const [rdmaSnap, setRdmaSnap] = useState<RdmaSnapSnapshot | null>(null);
+  const [cxlFabric, setCxlFabric] = useState<CxlFabricSnapshot | null>(null);
+  const [orbitalMesh, setOrbitalMesh] = useState<OrbitalMeshSnapshot | null>(null);
+  const [mpcTelemetry, setMpcTelemetry] = useState<MpcTelemetrySnapshot | null>(null);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -439,7 +490,7 @@ export const TelemetryDashboard: React.FC = () => {
   const fetchAllTelemetry = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes, encRes, neuRes, kvRes, gpuRes, mldRes, snapRes] = await Promise.all([
+      const [mRes, shRes, sbRes, ppRes, mtRes, cmRes, urRes, xdsRes, prRes, dpuRes, zkRes, rdmaRes, cpoRes, bbrRes, fmRes, afxRes, fedRes, repRes, encRes, neuRes, kvRes, gpuRes, mldRes, snapRes, cxlRes, orbRes, mpcRes] = await Promise.all([
         queryCEngine<MetricsSnapshot>('/metrics-json'),
         queryCEngine<SelfHealSnapshot>('/self-heal-status?json=1'),
         queryCEngine<SandboxSnapshot>('/sandbox-status?json=1'),
@@ -464,6 +515,9 @@ export const TelemetryDashboard: React.FC = () => {
         queryCEngine<GpuTeeSnapshot>('/gpu-tee-status?json=1'),
         queryCEngine<MldsaSnapshot>('/mldsa-status?json=1'),
         queryCEngine<RdmaSnapSnapshot>('/rdma-snap-status?json=1'),
+        queryCEngine<CxlFabricSnapshot>('/cxl-status?json=1'),
+        queryCEngine<OrbitalMeshSnapshot>('/orbital-status?json=1'),
+        queryCEngine<MpcTelemetrySnapshot>('/mpc-status?json=1'),
       ]);
 
       if (mRes.data) {
@@ -506,6 +560,9 @@ export const TelemetryDashboard: React.FC = () => {
       if (gpuRes.data) setGpuTee(gpuRes.data);
       if (mldRes.data) setMldsa(mldRes.data);
       if (snapRes.data) setRdmaSnap(snapRes.data);
+      if (cxlRes.data) setCxlFabric(cxlRes.data);
+      if (orbRes.data) setOrbitalMesh(orbRes.data);
+      if (mpcRes.data) setMpcTelemetry(mpcRes.data);
     } catch {
       // Transient C engine restart or polling hiccup
     } finally {
@@ -675,6 +732,26 @@ export const TelemetryDashboard: React.FC = () => {
     }
   };
 
+  const handleRunPhase21 = async () => {
+    setIsActionRunning(true);
+    setActionBanner(null);
+    try {
+      const [cxlRes, orbRes, mpcRes] = await Promise.all([
+        queryCEngine<{ pool_id: number; fabric_addr: string; access_ns: number; total_alloc_ops: number }>('/cxl/alloc?pool=0&bytes=2097152'),
+        queryCEngine<{ sat_id: string; snr_db: number; wave_lock: string; doppler_resyncs: number }>('/orbital/route?sat=LEO-STAR-01&doppler_khz=420'),
+        queryCEngine<{ cohort: string; cohort_sum: number; rounds_aggregated: number }>('/mpc/aggregate?cohort=eu-sovereign-ai&metric=12500'),
+      ]);
+      if (cxlRes.data && orbRes.data && mpcRes.data) {
+        setActionBanner(
+          `CXL Pool#${cxlRes.data.pool_id} @ ${cxlRes.data.fabric_addr} (${cxlRes.data.access_ns}ns) · OISL ${orbRes.data.sat_id} ${orbRes.data.wave_lock} (${orbRes.data.snr_db}dB) · MPC ${mpcRes.data.cohort} sum=${mpcRes.data.cohort_sum.toLocaleString()}`
+        );
+      }
+      await fetchAllTelemetry();
+    } finally {
+      setIsActionRunning(false);
+    }
+  };
+
   const totalStatusResponses = metrics
     ? metrics.http_status_200 + metrics.http_status_401 + metrics.http_status_404 + metrics.http_status_429
     : 0;
@@ -815,6 +892,15 @@ export const TelemetryDashboard: React.FC = () => {
           >
             <Cpu className="w-3.5 h-3.5" />
             <span>GPU · ML-DSA · Snap</span>
+          </button>
+
+          <button
+            onClick={handleRunPhase21}
+            disabled={isActionRunning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-950 bg-rose-400 hover:bg-rose-300 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>CXL · Orbital · MPC</span>
           </button>
 
           <button
@@ -1706,6 +1792,104 @@ export const TelemetryDashboard: React.FC = () => {
                     <td className="px-4 py-2 text-sky-300 tabular-nums">#{sn.state_seq}</td>
                     <td className="px-4 py-2 text-emerald-300 truncate max-w-[160px]" title={sn.merkle_root}>
                       {sn.merkle_root}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase 21: Sub-Microsecond CXL 3.1 Fabric, Confidential MPC Telemetry & Orbital OISL Mesh */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                CXL 3.1 Coherent Fabric & Confidential MPC (mod_cxl_fabric + mod_mpc_telemetry)
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {cxlFabric ? `${cxlFabric.cxl_spec} · ${formatBytes(cxlFabric.total_alloc_bytes)} allocated` : 'Loading CXL 3.1 fabric...'}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
+              {cxlFabric ? `${cxlFabric.total_alloc_ops.toLocaleString()} Ops` : '--'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">KV Cache Pool Latency</span>
+              <div className="text-base font-bold text-rose-300 tabular-nums">
+                {cxlFabric?.pools?.[0] ? `${cxlFabric.pools[0].access_ns} ns` : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {cxlFabric?.last_fabric_addr || '--'}
+              </span>
+            </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1">
+              <span className="text-slate-400 text-[11px]">SPDZ 3-Party MPC Sum</span>
+              <div className="text-base font-bold text-emerald-400 tabular-nums">
+                {mpcTelemetry ? mpcTelemetry.cumulative_blinded_sum.toLocaleString() : '--'}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {mpcTelemetry ? `${mpcTelemetry.party_quorum}-Party · ${mpcTelemetry.rounds_aggregated.toLocaleString()} rounds` : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5 text-xs font-mono">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">Active CXL Pool[0..3]</span>
+              <span className="text-rose-300 truncate">
+                {cxlFabric ? cxlFabric.pools.map((p) => `${p.label}(${p.access_ns}ns)`).join(' · ') : '--'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400 shrink-0">MPC SHA-256 Transcript ({mpcTelemetry?.last_cohort || '--'})</span>
+              <span className="text-emerald-300 truncate" title={mpcTelemetry?.last_transcript_hex}>
+                {mpcTelemetry?.last_transcript_hex || '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-6 bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">Orbital Optical Laser Mesh (mod_orbital_mesh)</h3>
+              <p className="text-[11px] font-mono text-slate-400">
+                {orbitalMesh ? `${orbitalMesh.constellation_id} · ${orbitalMesh.doppler_resyncs.toLocaleString()} OPLL resyncs` : 'Loading OISL mesh...'}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-rose-300 font-bold tabular-nums">
+              {orbitalMesh ? `${orbitalMesh.frames_relayed.toLocaleString()} frames` : '--'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-[11px]">
+                  <th className="px-4 py-2 font-medium">Satellite</th>
+                  <th className="px-4 py-2 font-medium">Orbit</th>
+                  <th className="px-4 py-2 font-medium">Doppler</th>
+                  <th className="px-4 py-2 font-medium">SNR</th>
+                  <th className="px-4 py-2 font-medium text-right">Wave Lock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(orbitalMesh?.links || []).map((lk) => (
+                  <tr key={lk.sat_id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                    <td className="px-4 py-2 text-rose-300 font-bold">{lk.sat_id}</td>
+                    <td className="px-4 py-2 text-slate-200">{lk.orbit_shell}</td>
+                    <td className="px-4 py-2 text-amber-300 tabular-nums">{lk.doppler_khz} kHz</td>
+                    <td className="px-4 py-2 text-sky-300 tabular-nums">{lk.snr_db} dB</td>
+                    <td className="px-4 py-2 text-right">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/70 text-emerald-400 border border-emerald-800/70">
+                        {lk.wave_lock}
+                      </span>
                     </td>
                   </tr>
                 ))}

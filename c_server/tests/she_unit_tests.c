@@ -34,6 +34,9 @@
 #include "modules/mod_gpu_tee.h"
 #include "modules/mod_mldsa_mesh.h"
 #include "modules/mod_rdma_snap.h"
+#include "modules/mod_cxl_fabric.h"
+#include "modules/mod_orbital_mesh.h"
+#include "modules/mod_mpc_telemetry.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -249,6 +252,20 @@ static void test_config_loader_and_plugins(void) {
     char snap_merkle[65] = {0};
     SHE_TEST_ASSERT(she_rdma_snap_commit("us-west-2", 5001ULL, snap_id, sizeof(snap_id), snap_merkle, sizeof(snap_merkle)) == 0 && strncmp(snap_id, "snap-", 5) == 0 && strlen(snap_merkle) == 64, "RDMA snapshot commits us-west-2 Merkle root");
     SHE_TEST_ASSERT(she_rdma_snap_commit("invalid-region", 0ULL, snap_id, sizeof(snap_id), snap_merkle, sizeof(snap_merkle)) != 0, "chaos: RDMA snapshot rejects invalid region / seq=0");
+
+    uint64_t cxl_addr = 0ULL;
+    SHE_TEST_ASSERT(she_cxl_alloc_coherent_page(0U, 2097152ULL, &cxl_addr) == 0 && (cxl_addr >> 56) == 0xC1ULL, "CXL 3.1 coherent page allocates in pool 0 with 0xC1 prefix");
+    SHE_TEST_ASSERT(she_cxl_alloc_coherent_page(99U, 0ULL, &cxl_addr) != 0, "chaos: CXL 3.1 rejects out-of-range pool_id=99 / zero bytes");
+
+    uint32_t orb_snr = 0U;
+    char orb_lock[24] = {0};
+    SHE_TEST_ASSERT(she_orbital_route_laser_link("LEO-STAR-01", 420U, &orb_snr, orb_lock, sizeof(orb_lock)) == 0 && strcmp(orb_lock, "OPLL_LOCKED") == 0, "Orbital OISL routes LEO-STAR-01 with OPLL_LOCKED");
+    SHE_TEST_ASSERT(she_orbital_route_laser_link("ROGUE-SAT", 99999U, &orb_snr, orb_lock, sizeof(orb_lock)) != 0, "chaos: Orbital OISL rejects untrusted sat prefix / excessive Doppler");
+
+    char mpc_hex[65] = {0};
+    uint64_t mpc_sum = 0ULL;
+    SHE_TEST_ASSERT(she_mpc_aggregate_telemetry("eu-sovereign-ai", 12500ULL, mpc_hex, sizeof(mpc_hex), &mpc_sum) == 0 && strlen(mpc_hex) == 64 && mpc_sum > 4820000ULL, "Confidential MPC aggregates 3-party SPDZ cohort sum with SHA-256 transcript");
+    SHE_TEST_ASSERT(she_mpc_aggregate_telemetry("invalid-cohort", 0ULL, mpc_hex, sizeof(mpc_hex), &mpc_sum) != 0, "chaos: Confidential MPC rejects invalid cohort / zero metric");
 }
 
 int main(void) {

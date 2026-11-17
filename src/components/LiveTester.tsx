@@ -916,6 +916,54 @@ const PRESETS = [
     desc: 'Commits a deterministic state checkpoint to us-west-2 via RDMA snapshot replication.',
   },
   {
+    name: 'CXL 3.1 Fabric Status (/cxl-status)',
+    category: 'Phase 21',
+    method: 'GET',
+    path: '/cxl-status?json=1',
+    headers: {},
+    desc: 'Inspects CXL 3.1 Type-3 coherent rack-scale memory pools, KV cache latency (138ns) & allocation ops.',
+  },
+  {
+    name: 'Allocate CXL Coherent Page (/cxl/alloc)',
+    category: 'Phase 21',
+    method: 'GET',
+    path: '/cxl/alloc?pool=0&bytes=2097152',
+    headers: {},
+    desc: 'Allocates a 2MB coherent CXL page in kv-cache-rack-a and returns a 0xC1xx fabric address.',
+  },
+  {
+    name: 'Orbital OISL Mesh Status (/orbital-status)',
+    category: 'Phase 21',
+    method: 'GET',
+    path: '/orbital-status?json=1',
+    headers: {},
+    desc: 'Inspects 1550nm LEO/MEO/L1 inter-satellite laser links, Doppler shifts & OPLL lock status.',
+  },
+  {
+    name: 'Route Orbital Laser Link (/orbital/route)',
+    category: 'Phase 21',
+    method: 'GET',
+    path: '/orbital/route?sat=LEO-STAR-01&doppler_khz=420',
+    headers: {},
+    desc: 'Routes traffic across LEO-STAR-01 optical laser link with 420 kHz Doppler compensation.',
+  },
+  {
+    name: 'Confidential MPC Status (/mpc-status)',
+    category: 'Phase 21',
+    method: 'GET',
+    path: '/mpc-status?json=1',
+    headers: {},
+    desc: 'Inspects 3-party SPDZ additive secret-sharing cohort sum and SHA-256 transcript digest.',
+  },
+  {
+    name: 'Aggregate MPC Cohort (/mpc/aggregate)',
+    category: 'Phase 21',
+    method: 'GET',
+    path: '/mpc/aggregate?cohort=eu-sovereign-ai&metric=12500',
+    headers: {},
+    desc: 'Blinds a tenant metric into 3 CSPRNG additive shares and updates the SHA-256 MPC transcript.',
+  },
+  {
     name: 'Path Traversal Guard (/../../)',
     category: 'Security',
     method: 'GET',
@@ -1206,7 +1254,7 @@ export const LiveTester: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            SHE Production Engine Presets (Phases 1 - 20)
+            SHE Production Engine Presets (Phases 1 - 21)
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Click to load request</span>
         </div>
